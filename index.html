@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>樂高抽屜管家 (多位置版)</title>
+    <title>樂高抽屜管家 (圖文版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -40,7 +40,7 @@
         }
 
         // Global State
-        // Structure: { "part_id": ["drawer_id_1", "drawer_id_2"] }
+        // Structure: { "part_id": { drawers: ["1", "2"], name: "...", img: "..." } }
         window.mappings = {}; 
         
         // Auth & Sync Logic
@@ -69,7 +69,7 @@
                 const newMappings = {};
                 snapshot.forEach((doc) => {
                     const data = doc.data();
-                    // Handle migration: older data might have 'drawer_id' (string), newer has 'drawers' (array)
+                    
                     let drawers = [];
                     if (Array.isArray(data.drawers)) {
                         drawers = data.drawers;
@@ -78,7 +78,12 @@
                     }
                     
                     if (drawers.length > 0) {
-                        newMappings[doc.id] = drawers;
+                        // Store detailed object
+                        newMappings[doc.id] = {
+                            drawers: drawers,
+                            name: data.part_name || "",
+                            img: data.img_url || "" // Retrieve image URL
+                        };
                     }
                 });
                 
@@ -103,28 +108,28 @@
         }
 
         // Cloud Actions
-        window.saveMappingCloud = async (partId, drawerId, partName) => {
+        window.saveMappingCloud = async (partId, drawerId, partName, imgUrl) => {
             if (!db) return;
             const syncAppId = 'lego-number-app';
             const docRef = doc(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings', partId);
 
             try {
-                // Check if document exists to decide between set (create) or update (append)
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
-                    // Append new drawer ID to the array using arrayUnion (avoids duplicates automatically)
                     await updateDoc(docRef, {
                         drawers: arrayUnion(drawerId),
                         part_name: partName,
+                        // Update img only if new one is valid, otherwise keep old
+                        img_url: imgUrl ? imgUrl : (docSnap.data().img_url || ""), 
                         updated_at: new Date().toISOString()
                     });
                 } else {
-                    // Create new document with array
                     await setDoc(docRef, {
                         part_id: partId,
                         drawers: [drawerId],
                         part_name: partName,
+                        img_url: imgUrl || "", // Save image URL
                         updated_at: new Date().toISOString()
                     });
                 }
@@ -140,7 +145,6 @@
             const syncAppId = 'lego-number-app';
             try {
                 const docRef = doc(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings', partId);
-                // Remove specific drawer from array
                 await updateDoc(docRef, {
                     drawers: arrayRemove(drawerIdToRemove)
                 });
@@ -217,8 +221,14 @@
                 </div>
                 
                 <div id="find-result" class="hidden mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <p class="text-gray-500 text-sm mb-1">辨識結果 (Part ID)</p>
-                    <p id="find-part-id" class="text-xl font-mono font-bold text-gray-800">---</p>
+                    <div class="flex items-center justify-center mb-2 space-x-3">
+                        <img id="find-api-img" src="" class="w-12 h-12 object-contain hidden bg-white rounded border border-gray-200" alt="Part Image">
+                        <div>
+                            <p class="text-gray-500 text-sm mb-0">辨識結果 (Part ID)</p>
+                            <p id="find-part-id" class="text-xl font-mono font-bold text-gray-800">---</p>
+                        </div>
+                    </div>
+                    
                     <div class="my-3 border-t border-gray-200"></div>
                     <p class="text-gray-500 text-sm mb-1">存放位置</p>
                     <p id="find-drawer-id" class="text-2xl font-bold text-blue-600 break-words">---</p>
@@ -241,7 +251,7 @@
                         </button>
                     </div>
 
-                    <!-- Quick Add Location Area (When found but want to add another) -->
+                    <!-- Quick Add Location Area -->
                     <div id="find-add-more" class="hidden mt-4 pt-4 border-t border-gray-200">
                          <button onclick="toggleQuickAdd()" class="text-xs text-blue-600 underline">同時放在其他抽屜？</button>
                          <div id="quick-add-panel" class="hidden mt-2 bg-blue-50 p-3 rounded">
@@ -319,6 +329,9 @@
 
                 <div id="encode-actions" class="hidden mt-4">
                     <div class="bg-gray-50 p-2 rounded border border-gray-200 mb-4">
+                        <div class="flex justify-center mb-2">
+                             <img id="encode-api-img" src="" class="w-16 h-16 object-contain hidden bg-white rounded border border-gray-200">
+                        </div>
                         <span class="text-xs text-gray-500">辨識到的零件 ID:</span>
                         <div id="encode-part-id" class="text-xl font-bold font-mono text-gray-800">---</div>
                         <div id="encode-part-name" class="text-xs text-gray-500 truncate mt-1"></div>
@@ -332,7 +345,7 @@
 
             <div class="bg-white p-4 rounded-xl shadow-lg">
                 <h3 class="font-bold text-gray-700 mb-2 text-sm">此抽屜已存放 (雲端資料):</h3>
-                <ul id="drawer-contents" class="text-sm text-gray-600 space-y-1 max-h-32 overflow-y-auto">
+                <ul id="drawer-contents" class="text-sm text-gray-600 space-y-2 max-h-64 overflow-y-auto pr-1">
                     <li class="italic text-gray-400">讀取中...</li>
                 </ul>
             </div>
@@ -344,6 +357,7 @@
         let currentMode = 'find';
         let currentPartId = null;
         let currentPartName = "";
+        let currentPartImgUrl = ""; 
         
         window.addEventListener('mappingsUpdated', () => {
             updateDrawerStatus();
@@ -411,18 +425,32 @@
             
             contentsList.innerHTML = '';
             
-            // New logic: Check if drawerId is IN the list of drawers for each part
-            // window.mappings = { "part_id": ["1", "5"] }
-            const parts = Object.entries(window.mappings || {}).filter(([pid, drawers]) => {
-                return Array.isArray(drawers) && drawers.includes(drawerId);
+            const parts = Object.entries(window.mappings || {}).filter(([pid, data]) => {
+                return data && Array.isArray(data.drawers) && data.drawers.includes(drawerId);
             });
             
             if (parts.length > 0) {
                 statusSpan.textContent = `(已有 ${parts.length} 種零件)`;
                 statusSpan.className = "ml-2 text-xs text-orange-500 font-bold";
-                parts.forEach(([pid]) => {
+                
+                parts.forEach(([pid, data]) => {
                     const li = document.createElement('li');
-                    li.innerHTML = `<span class="font-mono bg-gray-100 px-1 rounded">${pid}</span> <button onclick="removeMapping('${pid}', '${drawerId}')" class="text-red-500 ml-2 text-xs"><i class="fa-solid fa-trash"></i></button>`;
+                    li.className = "flex items-center justify-between bg-white border border-gray-200 rounded p-2 shadow-sm";
+                    
+                    let imgHtml = '';
+                    if (data.img) {
+                        imgHtml = `<img src="${data.img}" class="w-8 h-8 object-contain bg-gray-50 rounded border border-gray-100 mr-2">`;
+                    } else {
+                        imgHtml = `<div class="w-8 h-8 bg-gray-100 rounded border border-gray-100 mr-2 flex items-center justify-center text-gray-300"><i class="fa-solid fa-image"></i></div>`;
+                    }
+
+                    li.innerHTML = `
+                        <div class="flex items-center">
+                            ${imgHtml}
+                            <span class="font-mono font-bold text-gray-700">${pid}</span>
+                        </div>
+                        <button onclick="removeMapping('${pid}', '${drawerId}')" class="text-red-400 hover:text-red-600 p-2"><i class="fa-solid fa-trash"></i></button>
+                    `;
                     contentsList.appendChild(li);
                 });
             } else {
@@ -432,12 +460,10 @@
             }
         }
 
-        // Helper for Find Mode: check if a drawer ID is used by ANY part
         function getNextEmptyDrawerId() {
-            // Collect all used drawer IDs
             const usedDrawers = new Set();
-            Object.values(window.mappings || {}).forEach(drawers => {
-                if(Array.isArray(drawers)) drawers.forEach(d => usedDrawers.add(d));
+            Object.values(window.mappings || {}).forEach(data => {
+                if(data && Array.isArray(data.drawers)) data.drawers.forEach(d => usedDrawers.add(d));
             });
 
             for (let i = 1; i <= 234; i++) { 
@@ -523,34 +549,43 @@
                 const topItem = data.items[0];
                 const partId = topItem.id;
                 const partName = topItem.name;
+                
+                // 嘗試多種欄位名稱以增加成功率
+                const imgUrl = topItem.img_url || topItem.thumbnail_url || topItem.image_url || ""; 
 
-                // Save global state
                 currentPartId = partId;
                 currentPartName = partName;
+                currentPartImgUrl = imgUrl;
 
                 if (mode === 'find') {
                     document.getElementById('find-part-id').textContent = `${partId} (${partName})`;
-                    const drawers = (window.mappings || {})[partId]; // This is now an array
+                    
+                    const resultImg = document.getElementById('find-api-img');
+                    if(imgUrl) {
+                        resultImg.src = imgUrl;
+                        resultImg.classList.remove('hidden');
+                    } else {
+                        resultImg.classList.add('hidden');
+                    }
+
+                    const partData = (window.mappings || {})[partId];
+                    const drawers = partData ? partData.drawers : []; 
                     
                     const drawerDisplay = document.getElementById('find-drawer-id');
                     const quickAssign = document.getElementById('find-quick-assign');
                     const addMore = document.getElementById('find-add-more');
                     
                     if (drawers && drawers.length > 0) {
-                        // Display all drawers separated by comma
                         const drawerText = drawers.map(d => `抽屜 ${d}`).join(', ');
                         drawerDisplay.textContent = drawerText;
                         drawerDisplay.className = "text-2xl font-bold text-blue-600 break-words";
-                        
                         quickAssign.classList.add('hidden');
-                        addMore.classList.remove('hidden'); // Show option to add another location
+                        addMore.classList.remove('hidden');
                     } else {
                         drawerDisplay.textContent = "未登錄";
                         drawerDisplay.className = "text-4xl font-bold text-red-500";
-                        
                         quickAssign.classList.remove('hidden');
                         addMore.classList.add('hidden');
-                        // Pre-fill next empty
                         document.getElementById('find-drawer-input').value = getNextEmptyDrawerId();
                         document.getElementById('find-drawer-sub').checked = false;
                     }
@@ -559,6 +594,15 @@
                 } else if (mode === 'encode') {
                     document.getElementById('encode-part-id').textContent = partId;
                     document.getElementById('encode-part-name').textContent = partName;
+                    
+                    const actionImg = document.getElementById('encode-api-img');
+                    if(imgUrl) {
+                        actionImg.src = imgUrl;
+                        actionImg.classList.remove('hidden');
+                    } else {
+                        actionImg.classList.add('hidden');
+                    }
+
                     document.getElementById('encode-actions').classList.remove('hidden');
                 }
             } catch (error) {
@@ -573,7 +617,6 @@
         function toggleQuickAdd() {
             const panel = document.getElementById('quick-add-panel');
             panel.classList.toggle('hidden');
-            // Pre-fill next empty
             if (!panel.classList.contains('hidden')) {
                 document.getElementById('add-drawer-input').value = getNextEmptyDrawerId();
                 document.getElementById('add-drawer-sub').checked = false;
@@ -595,12 +638,9 @@
             const drawerId = isSub ? `${num}a` : `${num}`;
 
             if (window.saveMappingCloud) {
-                await window.saveMappingCloud(currentPartId, drawerId, currentPartName);
+                await window.saveMappingCloud(currentPartId, drawerId, currentPartName, currentPartImgUrl);
                 
                 showMessage(`已新增: ${currentPartId} -> 抽屜 ${drawerId}`);
-                
-                // Refresh Find Display manually (wait for sync usually, but for instant feedback):
-                // Note: The real update comes from onSnapshot
                 document.getElementById('quick-add-panel').classList.add('hidden');
                 if (!isAddMore) document.getElementById('find-quick-assign').classList.add('hidden');
             }
@@ -609,27 +649,27 @@
         function saveMapping() {
             if (!currentPartId) return;
             const drawerId = getDrawerString();
-            const drawers = (window.mappings || {})[currentPartId] || [];
+            const partData = (window.mappings || {})[currentPartId];
+            const drawers = partData ? partData.drawers : [];
             
-            // Check if already in THIS specific drawer
             if (drawers.includes(drawerId)) {
                 alert(`零件 ${currentPartId} 已經在抽屜 ${drawerId} 了。`);
                 return;
             }
             
             if (drawers.length > 0) {
-                 // Info message that we are adding a secondary location
                  if(!confirm(`此零件已存在於 [${drawers.join(', ')}]。\n確定要「增加」一個新位置 (抽屜 ${drawerId}) 嗎？`)) return;
             }
 
             if (window.saveMappingCloud) {
-                window.saveMappingCloud(currentPartId, drawerId, currentPartName);
+                window.saveMappingCloud(currentPartId, drawerId, currentPartName, currentPartImgUrl);
                 showMessage(`已新增位置: ${currentPartId} -> 抽屜 ${drawerId}`);
                 
                 document.getElementById('encode-preview').classList.add('hidden');
                 document.getElementById('encode-preview-container').querySelector('i').classList.remove('hidden');
                 document.getElementById('encode-actions').classList.add('hidden');
                 currentPartId = null;
+                currentPartImgUrl = "";
                 
                 setTimeout(() => findNextEmptyDrawer(true), 500);
             }
