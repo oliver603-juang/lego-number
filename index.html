@@ -266,6 +266,8 @@
                                 <input type="text" id="find-part-id-input" class="text-xl font-mono font-bold text-gray-800 w-32 bg-transparent outline-none" value="---" onchange="manualUpdateId('find')">
                                 <i class="fa-solid fa-pen text-gray-400 text-xs ml-1"></i>
                             </div>
+                            <!-- Retry Button -->
+                            <button id="find-retry-gemini" onclick="retryWithGemini()" class="hidden text-[10px] text-red-500 underline cursor-pointer hover:text-red-700 mt-1 block">結果不對？用 Gemini 重試</button>
                         </div>
                     </div>
                     
@@ -313,7 +315,7 @@
             
             <div class="bg-blue-50 p-4 rounded-lg text-sm text-blue-800 border border-blue-100">
                 <i class="fa-solid fa-circle-info mr-1"></i> 
-                優先使用 Brickognize 辨識。若失敗，將自動嘗試 Google Gemini AI (需設定 API Key)。
+                優先使用 Brickognize 辨識。若失敗或結果錯誤，可手動切換 Google Gemini AI。
             </div>
         </div>
 
@@ -376,6 +378,9 @@
                         </div>
                         <span class="text-xs text-gray-500">辨識結果 <span id="encode-source-tag" class="text-[10px] px-1 rounded bg-gray-200 text-gray-600">來源</span></span>
                         
+                        <!-- Retry Button (Encode) -->
+                        <button id="encode-retry-gemini" onclick="retryWithGemini()" class="hidden text-[10px] text-red-500 underline cursor-pointer hover:text-red-700 w-full text-center mb-1">結果不對？用 Gemini 重試</button>
+
                         <div class="flex justify-center mt-1">
                              <div class="flex items-center border-b-2 border-blue-200 focus-within:border-blue-500">
                                 <input type="text" id="encode-part-id-input" class="text-xl font-mono font-bold text-gray-800 w-32 bg-transparent outline-none text-center" value="---" onchange="manualUpdateId('encode')">
@@ -407,7 +412,8 @@
         let currentPartId = null;
         let currentPartName = "";
         let currentPartImgUrl = ""; 
-        // 1. 初始化時嘗試從 localStorage 讀取
+        let currentResizedBlob = null; // Store for retry
+        
         let geminiApiKey = localStorage.getItem('lego_gemini_key') || "";
         let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-2.0-flash";
 
@@ -415,11 +421,9 @@
         function toggleSettings() {
             document.getElementById('settings-modal').classList.toggle('hidden');
             if (!document.getElementById('settings-modal').classList.contains('hidden')) {
-                // 打開設定時，填入目前的 key 與 model
                 document.getElementById('gemini-api-key').value = geminiApiKey;
                 document.getElementById('gemini-model-select').value = geminiModel;
                 
-                // 如果有 key，顯示已儲存提示
                 if(geminiApiKey) document.getElementById('key-saved-msg').classList.remove('hidden');
                 else document.getElementById('key-saved-msg').classList.add('hidden');
             }
@@ -432,12 +436,11 @@
             geminiApiKey = key;
             geminiModel = model;
             
-            // 2. 儲存至 localStorage，確保下次開啟還在
             localStorage.setItem('lego_gemini_key', key);
             localStorage.setItem('lego_gemini_model', model);
             
             toggleSettings();
-            showMessage("設定已儲存 (Key 已記錄在瀏覽器中)", "success");
+            showMessage("設定已儲存", "success");
         }
         
         window.addEventListener('mappingsUpdated', () => {
@@ -594,7 +597,6 @@
                 throw new Error("請先設定 Google Gemini API Key");
             }
             
-            // Convert Blob to Base64
             const base64Data = await new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.onloadend = () => resolve(reader.result.split(',')[1]);
@@ -608,7 +610,6 @@
                 Return ONLY valid JSON format: { "id": "YOUR_ID", "name": "Short descriptive name" }. Do not use markdown code blocks.
             `;
 
-            // Use the selected model from global state
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -629,10 +630,77 @@
 
             const result = await response.json();
             const text = result.candidates[0].content.parts[0].text;
-            
-            // Clean JSON string (remove markdown if any)
             const jsonStr = text.replace(/```json|```/g, '').trim();
             return JSON.parse(jsonStr);
+        }
+
+        // --- Retry Logic ---
+        async function retryWithGemini() {
+            if (!currentResizedBlob) {
+                showMessage("找不到圖片，請重新拍照", "error");
+                return;
+            }
+            
+            const mode = currentMode;
+            const loadingDiv = document.getElementById(`${mode}-loading`);
+            const loadingText = mode === 'find' ? document.getElementById('loading-text') : document.getElementById('encode-loading-text');
+            
+            // Hide previous results
+            if (mode === 'find') document.getElementById('find-result').classList.add('hidden');
+            if (mode === 'encode') document.getElementById('encode-actions').classList.add('hidden');
+            
+            loadingDiv.classList.remove('hidden');
+            
+            let modelDisplayName = "Gemini AI";
+            if (geminiModel.includes("2.0-pro")) modelDisplayName = "Gemini 2.0 Pro";
+            else if (geminiModel.includes("2.0-flash")) modelDisplayName = "Gemini 2.0 Flash";
+            else if (geminiModel.includes("1.5-pro")) modelDisplayName = "Gemini 1.5 Pro";
+            else if (geminiModel.includes("1.5-flash")) modelDisplayName = "Gemini 1.5 Flash";
+
+            loadingText.textContent = `正切換至 ${modelDisplayName} 重新辨識...`;
+
+            try {
+                if (!geminiApiKey) throw new Error("請先在右上角設定 Gemini API Key 才能使用重試功能。");
+
+                const geminiResult = await callGeminiVision(currentResizedBlob);
+                const partId = geminiResult.id;
+                const partName = geminiResult.name;
+                
+                // Update UI directly here logic
+                currentPartId = partId;
+                currentPartName = partName;
+                currentPartImgUrl = ""; // Clear URL since Gemini doesn't return one
+
+                // Update Source Tag
+                const sourceTagId = mode === 'find' ? 'find-source-tag' : 'encode-source-tag';
+                const sourceTag = document.getElementById(sourceTagId);
+                sourceTag.textContent = modelDisplayName + " (重試)";
+                sourceTag.className = `text-[10px] px-1 rounded text-white bg-purple-600`;
+
+                if (mode === 'find') {
+                    document.getElementById('find-part-id-input').value = partId;
+                    document.getElementById('find-refresh-btn').classList.add('hidden');
+                    document.getElementById('find-api-img').classList.add('hidden'); // Hide img as Gemini provides none
+                    // Hide retry button as we are already on retry
+                    document.getElementById('find-retry-gemini').classList.add('hidden'); 
+
+                    checkAndDisplayDrawer(partId);
+                    document.getElementById('find-result').classList.remove('hidden');
+                } else if (mode === 'encode') {
+                    document.getElementById('encode-part-id-input').value = partId;
+                    document.getElementById('encode-part-name').textContent = partName;
+                    document.getElementById('encode-api-img').classList.add('hidden');
+                    document.getElementById('encode-retry-gemini').classList.add('hidden');
+
+                    document.getElementById('encode-actions').classList.remove('hidden');
+                }
+
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message, "error");
+            } finally {
+                loadingDiv.classList.add('hidden');
+            }
         }
 
         // --- Main Handler ---
@@ -640,7 +708,6 @@
             if (!input.files || !input.files[0]) return;
             const originalFile = input.files[0];
             
-            // Preview
             const reader = new FileReader();
             reader.onload = (e) => {
                 const imgId = mode === 'find' ? 'find-preview' : 'encode-preview';
@@ -668,6 +735,7 @@
 
             try {
                 const resizedBlob = await resizeImage(originalFile);
+                currentResizedBlob = resizedBlob; // Store globally for retry
                 
                 // 1. Try Brickognize First
                 try {
@@ -680,7 +748,6 @@
                     if (response.ok) {
                         const data = await response.json();
                         if (data.items && data.items.length > 0) {
-                            // High confidence result? (You can add confidence check here)
                             const topItem = data.items[0];
                             partId = topItem.id;
                             partName = topItem.name;
@@ -695,19 +762,14 @@
                 // 2. Fallback to Gemini if no ID found
                 if (!partId) {
                     if (geminiApiKey) {
-                        // Use user friendly name in loading text
                         let modelDisplayName = "Gemini AI";
                         if (geminiModel.includes("2.0-pro")) modelDisplayName = "Gemini 2.0 Pro";
                         else if (geminiModel.includes("2.0-flash")) modelDisplayName = "Gemini 2.0 Flash";
-                        else if (geminiModel.includes("1.5-pro")) modelDisplayName = "Gemini 1.5 Pro";
-                        else if (geminiModel.includes("1.5-flash")) modelDisplayName = "Gemini 1.5 Flash";
-
                         loadingText.textContent = `Brickognize 未識別，正在切換至 ${modelDisplayName}...`;
                         const geminiResult = await callGeminiVision(resizedBlob);
                         partId = geminiResult.id;
                         partName = geminiResult.name;
                         source = modelDisplayName;
-                        // Use the preview image itself as the thumbnail since Gemini doesn't return a URL
                         imgUrl = ""; 
                     } else {
                         throw new Error("無法辨識。Brickognize 無結果，且未設定 Gemini API Key。");
@@ -724,6 +786,12 @@
                 sourceTag.textContent = source;
                 sourceTag.className = `text-[10px] px-1 rounded text-white ${source === 'Brickognize' ? 'bg-green-500' : 'bg-purple-500'}`;
 
+                // Show retry button ONLY if source is Brickognize
+                const retryBtnId = mode === 'find' ? 'find-retry-gemini' : 'encode-retry-gemini';
+                const retryBtn = document.getElementById(retryBtnId);
+                if (source === 'Brickognize') retryBtn.classList.remove('hidden');
+                else retryBtn.classList.add('hidden');
+
                 if (mode === 'find') {
                     document.getElementById('find-part-id-input').value = partId;
                     document.getElementById('find-refresh-btn').classList.add('hidden');
@@ -733,7 +801,6 @@
                         resultImg.src = imgUrl;
                         resultImg.classList.remove('hidden');
                     } else {
-                        // If no URL (Gemini case), show icon
                         resultImg.classList.add('hidden');
                     }
 
