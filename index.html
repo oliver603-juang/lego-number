@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>樂高抽屜管家 (Gemini 2.0版)</title>
+    <title>樂高抽屜管家 (API修正版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -28,7 +28,6 @@
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : fallbackConfig;
         
-        // Initialize Firebase
         let app, auth, db;
         try {
             app = initializeApp(firebaseConfig);
@@ -38,16 +37,12 @@
             console.error("Firebase Init Error:", e);
         }
 
-        // Global State
         window.mappings = {}; 
         
-        // Auth & Sync Logic
         async function initApp() {
             if (!auth) return;
-
             onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    console.log("Logged in as:", user.uid);
                     document.getElementById('cloud-status').innerHTML = '<span class="text-green-600"><i class="fa-solid fa-cloud"></i> 已連線</span>';
                     startSync(user);
                 } else {
@@ -68,11 +63,9 @@
                 snapshot.forEach((doc) => {
                     const data = doc.data();
                     let drawers = [];
-                    if (Array.isArray(data.drawers)) {
-                        drawers = data.drawers;
-                    } else if (data.drawer_id) {
-                        drawers = [data.drawer_id];
-                    }
+                    if (Array.isArray(data.drawers)) drawers = data.drawers;
+                    else if (data.drawer_id) drawers = [data.drawer_id];
+                    
                     if (drawers.length > 0) {
                         newMappings[doc.id] = {
                             drawers: drawers,
@@ -81,7 +74,6 @@
                         };
                     }
                 });
-                
                 window.mappings = newMappings;
                 window.dispatchEvent(new Event('mappingsUpdated'));
                 
@@ -94,12 +86,10 @@
             });
         }
 
-        // Cloud Actions
         window.saveMappingCloud = async (partId, drawerId, partName, imgUrl) => {
             if (!db) return;
             const syncAppId = 'lego-number-app';
             const docRef = doc(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings', partId);
-
             try {
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
@@ -130,9 +120,7 @@
             const syncAppId = 'lego-number-app';
             try {
                 const docRef = doc(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings', partId);
-                await updateDoc(docRef, {
-                    drawers: arrayRemove(drawerIdToRemove)
-                });
+                await updateDoc(docRef, { drawers: arrayRemove(drawerIdToRemove) });
             } catch (e) {
                 console.error("Delete Error:", e);
                 alert("刪除失敗");
@@ -153,7 +141,6 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Modal Animation */
         .modal { transition: opacity 0.25s ease; }
         ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
@@ -181,7 +168,7 @@
             <h3 class="text-lg font-bold mb-4 flex items-center">
                 <i class="fa-solid fa-robot mr-2 text-blue-600"></i> AI 辨識設定
             </h3>
-            <p class="text-sm text-gray-600 mb-2">當 Brickognize 無法辨識時 (如樂拼/特殊件)，將自動切換至 Google Gemini AI。</p>
+            <p class="text-sm text-gray-600 mb-2">當 Brickognize 無法辨識時，將使用 Google Gemini AI。</p>
             
             <div class="mb-4">
                 <label class="block text-xs font-bold text-gray-700 mb-1">Google Gemini API Key</label>
@@ -193,22 +180,19 @@
             <div class="mb-4">
                 <label class="block text-xs font-bold text-gray-700 mb-1">AI 模型選擇</label>
                 <select id="gemini-model-select" class="w-full border rounded p-2 text-sm bg-gray-50 text-gray-800">
-                    <optgroup label="最新模型 (推薦)">
-                        <option value="gemini-2.0-pro-exp-02-05">Gemini 2.0 Pro (視覺最強)</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (速度最快)</option>
+                    <optgroup label="穩定版本 (推薦)">
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (免費額度最高/最穩)</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (高智商)</option>
                     </optgroup>
-                    <optgroup label="穩定版本">
-                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (穩定高智商)</option>
-                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (舊版輕量)</option>
+                    <optgroup label="實驗版本 (不穩)">
+                        <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</option>
                     </optgroup>
                 </select>
-                <div class="mt-2 bg-blue-50 p-2 rounded border border-blue-100">
-                    <p class="text-[10px] text-blue-800 font-bold mb-1">模型比較指南：</p>
-                    <ul class="text-[10px] text-gray-600 list-disc list-inside space-y-1">
-                        <li><strong>2.0 Pro</strong>：目前最強！能看懂複雜結構、微小凸點與紋理。若遇到Brickognize失敗的怪零件，選它準沒錯。</li>
-                        <li><strong>1.5 Pro</strong>：上一代旗艦。如果覺得 2.0 預覽版不穩定，這是最可靠的備案。</li>
-                        <li><strong>2.0 Flash</strong>：CP值之王。速度極快，適合連續掃描標準磚塊。</li>
-                    </ul>
+                <div class="mt-2 bg-red-50 p-2 rounded border border-red-100">
+                    <p class="text-[10px] text-red-800 font-bold mb-1">⚠️ 遇到 API 錯誤？</p>
+                    <p class="text-[10px] text-gray-600">
+                        如果出現 "Quota exceeded (limit: 0)" 或 "not found"，請切換回 <strong>Gemini 1.5 Flash</strong>，這是目前對免費帳號最友善的模型。
+                    </p>
                 </div>
             </div>
 
@@ -261,12 +245,10 @@
                         <img id="find-api-img" src="" class="w-12 h-12 object-contain hidden bg-white rounded border border-gray-200" alt="Part Image">
                         <div class="text-left">
                             <p class="text-gray-500 text-sm mb-0">辨識結果 <span id="find-source-tag" class="text-[10px] px-1 rounded bg-gray-200 text-gray-600">來源</span></p>
-                            <!-- Editable Input -->
                             <div class="flex items-center border-b-2 border-blue-200 focus-within:border-blue-500">
                                 <input type="text" id="find-part-id-input" class="text-xl font-mono font-bold text-gray-800 w-32 bg-transparent outline-none" value="---" onchange="manualUpdateId('find')">
                                 <i class="fa-solid fa-pen text-gray-400 text-xs ml-1"></i>
                             </div>
-                            <!-- Retry Button -->
                             <button id="find-retry-gemini" onclick="retryWithGemini()" class="hidden text-[10px] text-red-500 underline cursor-pointer hover:text-red-700 mt-1 block">結果不對？用 Gemini 重試</button>
                         </div>
                     </div>
@@ -277,10 +259,8 @@
                     <p class="text-gray-500 text-sm mb-1">存放位置</p>
                     <p id="find-drawer-id" class="text-2xl font-bold text-blue-600 break-words">---</p>
 
-                    <!-- Quick Assign Area -->
                     <div id="find-quick-assign" class="hidden mt-4 pt-4 border-t border-gray-300 bg-yellow-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-lg">
                         <p class="text-sm text-yellow-800 font-bold mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 未找到！立即指定位置：</p>
-                        
                         <div class="flex items-center space-x-2 mb-3 justify-center bg-white p-2 rounded border border-gray-200 shadow-sm">
                             <span class="text-sm text-gray-600">抽屜</span>
                             <input type="number" id="find-drawer-input" class="w-20 p-1 border rounded text-center font-bold text-lg" min="1" value="1">
@@ -289,13 +269,11 @@
                                 <span class="text-sm font-bold">夾層 a</span>
                             </label>
                         </div>
-                        
                         <button onclick="saveFromFindMode()" class="w-full bg-yellow-500 text-white py-2 rounded-lg font-bold shadow hover:bg-yellow-600 active:scale-95 transition-transform flex justify-center items-center">
                             <i class="fa-solid fa-plus-circle mr-2"></i> 儲存對應關係
                         </button>
                     </div>
 
-                    <!-- Quick Add Location Area -->
                     <div id="find-add-more" class="hidden mt-4 pt-4 border-t border-gray-200">
                          <button onclick="toggleQuickAdd()" class="text-xs text-blue-600 underline">同時放在其他抽屜？</button>
                          <div id="quick-add-panel" class="hidden mt-2 bg-blue-50 p-3 rounded">
@@ -315,14 +293,12 @@
             
             <div class="bg-blue-50 p-4 rounded-lg text-sm text-blue-800 border border-blue-100">
                 <i class="fa-solid fa-circle-info mr-1"></i> 
-                優先使用 Brickognize 辨識。若失敗或結果錯誤，可手動切換 Google Gemini AI。
+                優先使用 Brickognize 辨識。
             </div>
         </div>
 
         <!-- MODE 2: ENCODE DRAWER -->
         <div id="mode-encode" class="hidden space-y-6">
-            
-            <!-- Drawer Navigation -->
             <div class="bg-white p-4 rounded-xl shadow-lg">
                 <div class="flex justify-between items-center mb-2">
                     <h2 class="text-lg font-bold text-gray-700">當前設定抽屜</h2>
@@ -330,26 +306,17 @@
                         <i class="fa-solid fa-forward mr-1"></i>跳至未編碼
                     </button>
                 </div>
-
                 <div class="flex items-center space-x-2">
-                    <button onclick="adjustDrawer(-1)" class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 text-gray-600">
-                        <i class="fa-solid fa-minus"></i>
-                    </button>
-                    
+                    <button onclick="adjustDrawer(-1)" class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 text-gray-600"><i class="fa-solid fa-minus"></i></button>
                     <div class="flex-1 flex space-x-2">
                         <input type="number" id="drawer-num" value="1" min="1" max="234" class="w-full text-center text-2xl font-bold border-2 border-gray-300 rounded focus:border-blue-500 outline-none p-2" onchange="updateDrawerString()">
-                        
                         <label class="flex flex-col items-center justify-center p-2 border-2 border-gray-300 rounded cursor-pointer select-none bg-gray-50" id="sub-drawer-label">
                             <span class="text-xs text-gray-500 font-bold">夾層 a</span>
                             <input type="checkbox" id="drawer-sub" class="w-5 h-5 mt-1 accent-blue-600" onchange="updateDrawerString()">
                         </label>
                     </div>
-
-                    <button onclick="adjustDrawer(1)" class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 text-gray-600">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
+                    <button onclick="adjustDrawer(1)" class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 text-gray-600"><i class="fa-solid fa-plus"></i></button>
                 </div>
-                
                 <div class="text-center mt-2 text-gray-500 font-mono text-sm">
                     目前標記為: <span id="current-drawer-display" class="font-bold text-blue-600 text-lg">1</span>
                     <span id="drawer-status" class="ml-2 text-xs text-gray-400">(讀取中...)</span>
@@ -378,7 +345,6 @@
                         </div>
                         <span class="text-xs text-gray-500">辨識結果 <span id="encode-source-tag" class="text-[10px] px-1 rounded bg-gray-200 text-gray-600">來源</span></span>
                         
-                        <!-- Retry Button (Encode) -->
                         <button id="encode-retry-gemini" onclick="retryWithGemini()" class="hidden text-[10px] text-red-500 underline cursor-pointer hover:text-red-700 w-full text-center mb-1">結果不對？用 Gemini 重試</button>
 
                         <div class="flex justify-center mt-1">
@@ -387,12 +353,10 @@
                                 <i class="fa-solid fa-pen text-gray-400 text-xs ml-1"></i>
                             </div>
                         </div>
-
                         <div id="encode-part-name" class="text-xs text-gray-500 truncate mt-1"></div>
                     </div>
-
                     <button onclick="saveMapping()" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow hover:bg-blue-700 active:transform active:scale-95 transition-all flex justify-center items-center">
-                        <i class="fa-solid fa-plus mr-2"></i> 加入此抽屜 (不影響舊位置)
+                        <i class="fa-solid fa-plus mr-2"></i> 加入此抽屜
                     </button>
                 </div>
             </div>
@@ -412,18 +376,17 @@
         let currentPartId = null;
         let currentPartName = "";
         let currentPartImgUrl = ""; 
-        let currentResizedBlob = null; // Store for retry
+        let currentResizedBlob = null; 
         
         let geminiApiKey = localStorage.getItem('lego_gemini_key') || "";
-        let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-2.0-flash";
+        // Default to stable 1.5 flash for best free tier support
+        let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-1.5-flash";
 
-        // UI toggles
         function toggleSettings() {
             document.getElementById('settings-modal').classList.toggle('hidden');
             if (!document.getElementById('settings-modal').classList.contains('hidden')) {
                 document.getElementById('gemini-api-key').value = geminiApiKey;
                 document.getElementById('gemini-model-select').value = geminiModel;
-                
                 if(geminiApiKey) document.getElementById('key-saved-msg').classList.remove('hidden');
                 else document.getElementById('key-saved-msg').classList.add('hidden');
             }
@@ -432,24 +395,16 @@
         function saveSettings() {
             const key = document.getElementById('gemini-api-key').value.trim();
             const model = document.getElementById('gemini-model-select').value;
-            
             geminiApiKey = key;
             geminiModel = model;
-            
             localStorage.setItem('lego_gemini_key', key);
             localStorage.setItem('lego_gemini_model', model);
-            
             toggleSettings();
             showMessage("設定已儲存", "success");
         }
         
-        window.addEventListener('mappingsUpdated', () => {
-            updateDrawerStatus();
-        });
-
-        document.addEventListener('DOMContentLoaded', () => {
-            updateDrawerStatus();
-        });
+        window.addEventListener('mappingsUpdated', () => { updateDrawerStatus(); });
+        document.addEventListener('DOMContentLoaded', () => { updateDrawerStatus(); });
 
         function showMessage(msg, type = 'success') {
             const box = document.getElementById('message-box');
@@ -473,13 +428,10 @@
             } else {
                 tabEncode.className = "flex-1 py-3 text-center border-b-2 border-blue-600 font-bold text-blue-600 bg-blue-50 transition-colors";
                 tabFind.className = "flex-1 py-3 text-center border-b-2 border-transparent text-gray-500 hover:text-blue-500 transition-colors";
-                if (Object.keys(window.mappings).length > 0) {
-                    findNextEmptyDrawer(false); 
-                }
+                if (Object.keys(window.mappings).length > 0) findNextEmptyDrawer(false); 
             }
         }
 
-        // --- Logic ---
         function getDrawerString() {
             const num = document.getElementById('drawer-num').value;
             const isSub = document.getElementById('drawer-sub').checked;
@@ -591,11 +543,8 @@
             });
         }
 
-        // --- Gemini AI Logic ---
         async function callGeminiVision(fileBlob) {
-            if (!geminiApiKey) {
-                throw new Error("請先設定 Google Gemini API Key");
-            }
+            if (!geminiApiKey) throw new Error("請先設定 Google Gemini API Key");
             
             const base64Data = await new Promise((resolve) => {
                 const reader = new FileReader();
@@ -625,7 +574,10 @@
 
             if (!response.ok) {
                 const err = await response.json();
-                throw new Error("Gemini API Error: " + (err.error?.message || response.statusText));
+                let errMsg = err.error?.message || response.statusText;
+                if(response.status === 429) errMsg = "API 額度不足 (429)。請切換至 1.5 Flash。";
+                if(response.status === 404) errMsg = "模型找不到 (404)。請切換模型設定。";
+                throw new Error(errMsg);
             }
 
             const result = await response.json();
@@ -634,7 +586,6 @@
             return JSON.parse(jsonStr);
         }
 
-        // --- Retry Logic ---
         async function retryWithGemini() {
             if (!currentResizedBlob) {
                 showMessage("找不到圖片，請重新拍照", "error");
@@ -645,43 +596,32 @@
             const loadingDiv = document.getElementById(`${mode}-loading`);
             const loadingText = mode === 'find' ? document.getElementById('loading-text') : document.getElementById('encode-loading-text');
             
-            // Hide previous results
             if (mode === 'find') document.getElementById('find-result').classList.add('hidden');
             if (mode === 'encode') document.getElementById('encode-actions').classList.add('hidden');
             
             loadingDiv.classList.remove('hidden');
-            
-            let modelDisplayName = "Gemini AI";
-            if (geminiModel.includes("2.0-pro")) modelDisplayName = "Gemini 2.0 Pro";
-            else if (geminiModel.includes("2.0-flash")) modelDisplayName = "Gemini 2.0 Flash";
-            else if (geminiModel.includes("1.5-pro")) modelDisplayName = "Gemini 1.5 Pro";
-            else if (geminiModel.includes("1.5-flash")) modelDisplayName = "Gemini 1.5 Flash";
-
-            loadingText.textContent = `正切換至 ${modelDisplayName} 重新辨識...`;
+            loadingText.textContent = `正切換至 ${geminiModel} 重新辨識...`;
 
             try {
-                if (!geminiApiKey) throw new Error("請先在右上角設定 Gemini API Key 才能使用重試功能。");
+                if (!geminiApiKey) throw new Error("請先在右上角設定 Gemini API Key");
 
                 const geminiResult = await callGeminiVision(currentResizedBlob);
                 const partId = geminiResult.id;
                 const partName = geminiResult.name;
                 
-                // Update UI directly here logic
                 currentPartId = partId;
                 currentPartName = partName;
-                currentPartImgUrl = ""; // Clear URL since Gemini doesn't return one
+                currentPartImgUrl = ""; 
 
-                // Update Source Tag
                 const sourceTagId = mode === 'find' ? 'find-source-tag' : 'encode-source-tag';
                 const sourceTag = document.getElementById(sourceTagId);
-                sourceTag.textContent = modelDisplayName + " (重試)";
+                sourceTag.textContent = "Gemini (重試)";
                 sourceTag.className = `text-[10px] px-1 rounded text-white bg-purple-600`;
 
                 if (mode === 'find') {
                     document.getElementById('find-part-id-input').value = partId;
                     document.getElementById('find-refresh-btn').classList.add('hidden');
-                    document.getElementById('find-api-img').classList.add('hidden'); // Hide img as Gemini provides none
-                    // Hide retry button as we are already on retry
+                    document.getElementById('find-api-img').classList.add('hidden'); 
                     document.getElementById('find-retry-gemini').classList.add('hidden'); 
 
                     checkAndDisplayDrawer(partId);
@@ -703,7 +643,6 @@
             }
         }
 
-        // --- Main Handler ---
         async function handleImage(input, mode) {
             if (!input.files || !input.files[0]) return;
             const originalFile = input.files[0];
@@ -735,9 +674,8 @@
 
             try {
                 const resizedBlob = await resizeImage(originalFile);
-                currentResizedBlob = resizedBlob; // Store globally for retry
+                currentResizedBlob = resizedBlob; 
                 
-                // 1. Try Brickognize First
                 try {
                     const fileToUpload = new File([resizedBlob], "query.jpg", { type: "image/jpeg" });
                     const formData = new FormData();
@@ -759,24 +697,19 @@
                     console.warn("Brickognize failed, trying fallback...", e);
                 }
 
-                // 2. Fallback to Gemini if no ID found
                 if (!partId) {
                     if (geminiApiKey) {
-                        let modelDisplayName = "Gemini AI";
-                        if (geminiModel.includes("2.0-pro")) modelDisplayName = "Gemini 2.0 Pro";
-                        else if (geminiModel.includes("2.0-flash")) modelDisplayName = "Gemini 2.0 Flash";
-                        loadingText.textContent = `Brickognize 未識別，正在切換至 ${modelDisplayName}...`;
+                        loadingText.textContent = `Brickognize 未識別，正在切換至 ${geminiModel}...`;
                         const geminiResult = await callGeminiVision(resizedBlob);
                         partId = geminiResult.id;
                         partName = geminiResult.name;
-                        source = modelDisplayName;
+                        source = "Gemini AI";
                         imgUrl = ""; 
                     } else {
                         throw new Error("無法辨識。Brickognize 無結果，且未設定 Gemini API Key。");
                     }
                 }
 
-                // --- Update UI ---
                 currentPartId = partId;
                 currentPartName = partName;
                 currentPartImgUrl = imgUrl;
@@ -786,7 +719,6 @@
                 sourceTag.textContent = source;
                 sourceTag.className = `text-[10px] px-1 rounded text-white ${source === 'Brickognize' ? 'bg-green-500' : 'bg-purple-500'}`;
 
-                // Show retry button ONLY if source is Brickognize
                 const retryBtnId = mode === 'find' ? 'find-retry-gemini' : 'encode-retry-gemini';
                 const retryBtn = document.getElementById(retryBtnId);
                 if (source === 'Brickognize') retryBtn.classList.remove('hidden');
@@ -831,7 +763,6 @@
             }
         }
 
-        // --- Logic for Manual ID Editing & UI Updates (Same as before) ---
         function manualUpdateId(mode) {
             const inputId = mode === 'find' ? 'find-part-id-input' : 'encode-part-id-input';
             const newId = document.getElementById(inputId).value.trim();
