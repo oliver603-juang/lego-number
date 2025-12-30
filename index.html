@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>樂高抽屜管家 (雲端版)</title>
+    <title>樂高抽屜管家 (多位置版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -13,7 +13,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
         const fallbackConfig = {
@@ -27,8 +27,7 @@
         };
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : fallbackConfig;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'lego-number-app';
-
+        
         // Initialize Firebase
         let app, auth, db;
         try {
@@ -41,6 +40,7 @@
         }
 
         // Global State
+        // Structure: { "part_id": ["drawer_id_1", "drawer_id_2"] }
         window.mappings = {}; 
         
         // Auth & Sync Logic
@@ -69,7 +69,17 @@
                 const newMappings = {};
                 snapshot.forEach((doc) => {
                     const data = doc.data();
-                    newMappings[doc.id] = data.drawer_id;
+                    // Handle migration: older data might have 'drawer_id' (string), newer has 'drawers' (array)
+                    let drawers = [];
+                    if (Array.isArray(data.drawers)) {
+                        drawers = data.drawers;
+                    } else if (data.drawer_id) {
+                        drawers = [data.drawer_id];
+                    }
+                    
+                    if (drawers.length > 0) {
+                        newMappings[doc.id] = drawers;
+                    }
                 });
                 
                 window.mappings = newMappings;
@@ -92,30 +102,48 @@
             });
         }
 
+        // Cloud Actions
         window.saveMappingCloud = async (partId, drawerId, partName) => {
             if (!db) return;
             const syncAppId = 'lego-number-app';
+            const docRef = doc(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings', partId);
+
             try {
-                const ref = doc(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings', partId);
-                await setDoc(ref, {
-                    part_id: partId,
-                    drawer_id: drawerId,
-                    part_name: partName,
-                    updated_at: new Date().toISOString()
-                });
+                // Check if document exists to decide between set (create) or update (append)
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    // Append new drawer ID to the array using arrayUnion (avoids duplicates automatically)
+                    await updateDoc(docRef, {
+                        drawers: arrayUnion(drawerId),
+                        part_name: partName,
+                        updated_at: new Date().toISOString()
+                    });
+                } else {
+                    // Create new document with array
+                    await setDoc(docRef, {
+                        part_id: partId,
+                        drawers: [drawerId],
+                        part_name: partName,
+                        updated_at: new Date().toISOString()
+                    });
+                }
             } catch (e) {
                 console.error("Save Error:", e);
                 alert("儲存失敗: " + e.message);
-                throw e; // Rethrow to handle UI
+                throw e;
             }
         };
 
-        window.removeMappingCloud = async (partId) => {
+        window.removeMappingCloud = async (partId, drawerIdToRemove) => {
             if (!db) return;
             const syncAppId = 'lego-number-app';
             try {
-                const ref = doc(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings', partId);
-                await deleteDoc(ref);
+                const docRef = doc(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings', partId);
+                // Remove specific drawer from array
+                await updateDoc(docRef, {
+                    drawers: arrayRemove(drawerIdToRemove)
+                });
             } catch (e) {
                 console.error("Delete Error:", e);
                 alert("刪除失敗");
@@ -193,9 +221,9 @@
                     <p id="find-part-id" class="text-xl font-mono font-bold text-gray-800">---</p>
                     <div class="my-3 border-t border-gray-200"></div>
                     <p class="text-gray-500 text-sm mb-1">存放位置</p>
-                    <p id="find-drawer-id" class="text-4xl font-bold text-blue-600">---</p>
+                    <p id="find-drawer-id" class="text-2xl font-bold text-blue-600 break-words">---</p>
 
-                    <!-- Quick Assign Area (New Feature) -->
+                    <!-- Quick Assign Area -->
                     <div id="find-quick-assign" class="hidden mt-4 pt-4 border-t border-gray-300 bg-yellow-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-lg">
                         <p class="text-sm text-yellow-800 font-bold mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 未找到！立即指定位置：</p>
                         
@@ -211,6 +239,22 @@
                         <button onclick="saveFromFindMode()" class="w-full bg-yellow-500 text-white py-2 rounded-lg font-bold shadow hover:bg-yellow-600 active:scale-95 transition-transform flex justify-center items-center">
                             <i class="fa-solid fa-plus-circle mr-2"></i> 儲存對應關係
                         </button>
+                    </div>
+
+                    <!-- Quick Add Location Area (When found but want to add another) -->
+                    <div id="find-add-more" class="hidden mt-4 pt-4 border-t border-gray-200">
+                         <button onclick="toggleQuickAdd()" class="text-xs text-blue-600 underline">同時放在其他抽屜？</button>
+                         <div id="quick-add-panel" class="hidden mt-2 bg-blue-50 p-3 rounded">
+                            <div class="flex items-center space-x-2 mb-2 justify-center">
+                                <span class="text-sm text-gray-600">新增抽屜</span>
+                                <input type="number" id="add-drawer-input" class="w-16 p-1 border rounded text-center" min="1" value="1">
+                                <label class="flex items-center space-x-1">
+                                    <input type="checkbox" id="add-drawer-sub" class="w-4 h-4 accent-blue-600">
+                                    <span class="text-xs">a</span>
+                                </label>
+                            </div>
+                            <button onclick="saveFromFindMode(true)" class="w-full bg-blue-500 text-white py-1 rounded text-sm font-bold">新增位置</button>
+                         </div>
                     </div>
                 </div>
             </div>
@@ -281,7 +325,7 @@
                     </div>
 
                     <button onclick="saveMapping()" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow hover:bg-blue-700 active:transform active:scale-95 transition-all flex justify-center items-center">
-                        <i class="fa-solid fa-cloud-arrow-up mr-2"></i> 連結並上傳雲端
+                        <i class="fa-solid fa-plus mr-2"></i> 加入此抽屜 (不影響舊位置)
                     </button>
                 </div>
             </div>
@@ -367,14 +411,18 @@
             
             contentsList.innerHTML = '';
             
-            const parts = Object.entries(window.mappings || {}).filter(([pid, did]) => did === drawerId);
+            // New logic: Check if drawerId is IN the list of drawers for each part
+            // window.mappings = { "part_id": ["1", "5"] }
+            const parts = Object.entries(window.mappings || {}).filter(([pid, drawers]) => {
+                return Array.isArray(drawers) && drawers.includes(drawerId);
+            });
             
             if (parts.length > 0) {
                 statusSpan.textContent = `(已有 ${parts.length} 種零件)`;
                 statusSpan.className = "ml-2 text-xs text-orange-500 font-bold";
                 parts.forEach(([pid]) => {
                     const li = document.createElement('li');
-                    li.innerHTML = `<span class="font-mono bg-gray-100 px-1 rounded">${pid}</span> <button onclick="removeMapping('${pid}')" class="text-red-500 ml-2 text-xs"><i class="fa-solid fa-trash"></i></button>`;
+                    li.innerHTML = `<span class="font-mono bg-gray-100 px-1 rounded">${pid}</span> <button onclick="removeMapping('${pid}', '${drawerId}')" class="text-red-500 ml-2 text-xs"><i class="fa-solid fa-trash"></i></button>`;
                     contentsList.appendChild(li);
                 });
             } else {
@@ -384,9 +432,14 @@
             }
         }
 
-        // Updated Helper for Find Mode
+        // Helper for Find Mode: check if a drawer ID is used by ANY part
         function getNextEmptyDrawerId() {
-            const usedDrawers = new Set(Object.values(window.mappings || {}));
+            // Collect all used drawer IDs
+            const usedDrawers = new Set();
+            Object.values(window.mappings || {}).forEach(drawers => {
+                if(Array.isArray(drawers)) drawers.forEach(d => usedDrawers.add(d));
+            });
+
             for (let i = 1; i <= 234; i++) { 
                 if (!usedDrawers.has(`${i}`)) return i;
             }
@@ -446,7 +499,8 @@
             document.getElementById(`${mode}-loading`).classList.remove('hidden');
             if (mode === 'find') {
                 document.getElementById('find-result').classList.add('hidden');
-                document.getElementById('find-quick-assign').classList.add('hidden'); // Reset
+                document.getElementById('find-quick-assign').classList.add('hidden');
+                document.getElementById('find-add-more').classList.add('hidden');
             }
             if (mode === 'encode') document.getElementById('encode-actions').classList.add('hidden');
 
@@ -470,26 +524,33 @@
                 const partId = topItem.id;
                 const partName = topItem.name;
 
-                // Save global state regardless of mode for saving later
+                // Save global state
                 currentPartId = partId;
                 currentPartName = partName;
 
                 if (mode === 'find') {
                     document.getElementById('find-part-id').textContent = `${partId} (${partName})`;
-                    const drawer = (window.mappings || {})[partId];
+                    const drawers = (window.mappings || {})[partId]; // This is now an array
+                    
                     const drawerDisplay = document.getElementById('find-drawer-id');
                     const quickAssign = document.getElementById('find-quick-assign');
+                    const addMore = document.getElementById('find-add-more');
                     
-                    if (drawer) {
-                        drawerDisplay.textContent = `抽屜 ${drawer}`;
-                        drawerDisplay.className = "text-4xl font-bold text-blue-600";
+                    if (drawers && drawers.length > 0) {
+                        // Display all drawers separated by comma
+                        const drawerText = drawers.map(d => `抽屜 ${d}`).join(', ');
+                        drawerDisplay.textContent = drawerText;
+                        drawerDisplay.className = "text-2xl font-bold text-blue-600 break-words";
+                        
                         quickAssign.classList.add('hidden');
+                        addMore.classList.remove('hidden'); // Show option to add another location
                     } else {
                         drawerDisplay.textContent = "未登錄";
                         drawerDisplay.className = "text-4xl font-bold text-red-500";
-                        // Show Quick Assign
+                        
                         quickAssign.classList.remove('hidden');
-                        // Pre-fill next empty drawer for convenience
+                        addMore.classList.add('hidden');
+                        // Pre-fill next empty
                         document.getElementById('find-drawer-input').value = getNextEmptyDrawerId();
                         document.getElementById('find-drawer-sub').checked = false;
                     }
@@ -509,36 +570,61 @@
             }
         }
 
-        // Save from Find Mode (New Feature)
-        async function saveFromFindMode() {
+        function toggleQuickAdd() {
+            const panel = document.getElementById('quick-add-panel');
+            panel.classList.toggle('hidden');
+            // Pre-fill next empty
+            if (!panel.classList.contains('hidden')) {
+                document.getElementById('add-drawer-input').value = getNextEmptyDrawerId();
+                document.getElementById('add-drawer-sub').checked = false;
+            }
+        }
+
+        async function saveFromFindMode(isAddMore = false) {
             if (!currentPartId) return;
-            const num = document.getElementById('find-drawer-input').value;
-            const isSub = document.getElementById('find-drawer-sub').checked;
+            
+            let num, isSub;
+            if (isAddMore) {
+                num = document.getElementById('add-drawer-input').value;
+                isSub = document.getElementById('add-drawer-sub').checked;
+            } else {
+                num = document.getElementById('find-drawer-input').value;
+                isSub = document.getElementById('find-drawer-sub').checked;
+            }
+            
             const drawerId = isSub ? `${num}a` : `${num}`;
 
             if (window.saveMappingCloud) {
                 await window.saveMappingCloud(currentPartId, drawerId, currentPartName);
                 
-                // Update UI to success state
                 showMessage(`已新增: ${currentPartId} -> 抽屜 ${drawerId}`);
-                document.getElementById('find-drawer-id').textContent = `抽屜 ${drawerId}`;
-                document.getElementById('find-drawer-id').className = "text-4xl font-bold text-blue-600";
-                document.getElementById('find-quick-assign').classList.add('hidden');
+                
+                // Refresh Find Display manually (wait for sync usually, but for instant feedback):
+                // Note: The real update comes from onSnapshot
+                document.getElementById('quick-add-panel').classList.add('hidden');
+                if (!isAddMore) document.getElementById('find-quick-assign').classList.add('hidden');
             }
         }
 
         function saveMapping() {
             if (!currentPartId) return;
             const drawerId = getDrawerString();
-            const mappings = window.mappings || {};
+            const drawers = (window.mappings || {})[currentPartId] || [];
             
-            if (mappings[currentPartId] && mappings[currentPartId] !== drawerId) {
-                if (!confirm(`零件 ${currentPartId} 已經在抽屜 ${mappings[currentPartId]}。要移動到這裡嗎？`)) return;
+            // Check if already in THIS specific drawer
+            if (drawers.includes(drawerId)) {
+                alert(`零件 ${currentPartId} 已經在抽屜 ${drawerId} 了。`);
+                return;
+            }
+            
+            if (drawers.length > 0) {
+                 // Info message that we are adding a secondary location
+                 if(!confirm(`此零件已存在於 [${drawers.join(', ')}]。\n確定要「增加」一個新位置 (抽屜 ${drawerId}) 嗎？`)) return;
             }
 
             if (window.saveMappingCloud) {
                 window.saveMappingCloud(currentPartId, drawerId, currentPartName);
-                showMessage(`已上傳: ${currentPartId} -> 抽屜 ${drawerId}`);
+                showMessage(`已新增位置: ${currentPartId} -> 抽屜 ${drawerId}`);
                 
                 document.getElementById('encode-preview').classList.add('hidden');
                 document.getElementById('encode-preview-container').querySelector('i').classList.remove('hidden');
@@ -549,10 +635,10 @@
             }
         }
 
-        function removeMapping(partId) {
-            if (confirm(`確定要從雲端移除零件 ${partId} 嗎？`)) {
+        function removeMapping(partId, drawerId) {
+            if (confirm(`確定要從抽屜 ${drawerId} 移除零件 ${partId} 嗎？\n(其他抽屜的紀錄將會保留)`)) {
                 if (window.removeMappingCloud) {
-                    window.removeMappingCloud(partId);
+                    window.removeMappingCloud(partId, drawerId);
                 }
             }
         }
