@@ -2,8 +2,16 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>樂高抽屜管家 (API修正版)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>樂高抽屜管家 (PWA版)</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -13,7 +21,6 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        // 新增 writeBatch 與 getDocs 以支援批次刪除
         import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, arrayUnion, arrayRemove, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
@@ -128,7 +135,6 @@
             }
         };
 
-        // 清空所有資料功能
         window.clearAllCloudData = async () => {
             if (!db) return;
             if (!confirm("【嚴重警告】\n這將會清空雲端上「所有」的抽屜與零件對應資料！\n\n此操作無法復原，您確定要繼續嗎？")) return;
@@ -149,7 +155,6 @@
                     return;
                 }
 
-                // Firestore 批次寫入限制為 500 筆
                 const batchSize = 500;
                 let batch = writeBatch(db);
                 let count = 0;
@@ -170,7 +175,7 @@
                     totalDeleted += count;
                 }
 
-                toggleSettings(); // 關閉設定視窗
+                toggleSettings();
                 showMessage(`成功清空 ${totalDeleted} 筆零件資料`, "success");
 
             } catch (e) {
@@ -224,7 +229,6 @@
                 <i class="fa-solid fa-robot mr-2 text-blue-600"></i> 設定
             </h3>
             
-            <!-- API Settings -->
             <div class="mb-6">
                 <p class="text-sm text-gray-600 mb-2 font-bold">AI 辨識設定</p>
                 <div class="mb-4">
@@ -440,8 +444,20 @@
         let currentResizedBlob = null; 
         
         let geminiApiKey = localStorage.getItem('lego_gemini_key') || "";
-        // Default to stable 1.5 flash for best free tier support
         let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-1.5-flash";
+
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then((registration) => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
 
         function toggleSettings() {
             document.getElementById('settings-modal').classList.toggle('hidden');
