@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂高抽屜管家 (無限抽屜版)</title>
+    <title>樂高抽屜管家 (即時查重版)</title>
     
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -226,7 +226,7 @@
     <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 class="text-lg font-bold mb-4 flex items-center">
-                <i class="fa-solid fa-robot mr-2 text-blue-600"></i> 設定
+                <i class="fa-solid fa-robot mr-2 text-blue-600"></i> AI 辨識設定
             </h3>
             
             <div class="mb-6">
@@ -374,7 +374,7 @@
                 <div class="flex items-center space-x-2">
                     <button onclick="adjustDrawer(-1)" class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 text-gray-600"><i class="fa-solid fa-minus"></i></button>
                     <div class="flex-1 flex space-x-2">
-                        <!-- UPDATE: Increased max value to 9999 -->
+                        <!-- UPDATE: Max drawer number increased -->
                         <input type="number" id="drawer-num" value="1" min="1" max="9999" class="w-full text-center text-2xl font-bold border-2 border-gray-300 rounded focus:border-blue-500 outline-none p-2" onchange="updateDrawerString()">
                         <label class="flex flex-col items-center justify-center p-2 border-2 border-gray-300 rounded cursor-pointer select-none bg-gray-50" id="sub-drawer-label">
                             <span class="text-xs text-gray-500 font-bold">夾層 a</span>
@@ -420,6 +420,12 @@
                             </div>
                         </div>
                         <div id="encode-part-name" class="text-xs text-gray-500 truncate mt-1"></div>
+                        
+                        <!-- Duplicate Check UI (New) -->
+                        <div id="encode-duplicate-warning" class="hidden mt-2 bg-blue-100 border border-blue-300 text-blue-800 p-2 rounded text-xs font-bold flex items-center justify-center">
+                            <i class="fa-solid fa-circle-info mr-2"></i>
+                            <span id="encode-duplicate-text"></span>
+                        </div>
                     </div>
                     <button onclick="saveMapping()" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow hover:bg-blue-700 active:transform active:scale-95 transition-all flex justify-center items-center">
                         <i class="fa-solid fa-plus mr-2"></i> 加入此抽屜
@@ -447,16 +453,10 @@
         let geminiApiKey = localStorage.getItem('lego_gemini_key') || "";
         let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-1.5-flash";
 
-        // Service Worker Registration
+        // Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js')
-                    .then((registration) => {
-                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                    })
-                    .catch((error) => {
-                        console.log('ServiceWorker registration failed: ', error);
-                    });
+                navigator.serviceWorker.register('./service-worker.js');
             });
         }
 
@@ -526,7 +526,6 @@
             const input = document.getElementById('drawer-num');
             let val = parseInt(input.value) + delta;
             if (val < 1) val = 1;
-            // UPDATE: Removed hardcoded limit of 234, using 9999
             if (val > 9999) val = 9999; 
             input.value = val;
             if (delta !== 0) document.getElementById('drawer-sub').checked = false;
@@ -580,7 +579,6 @@
             Object.values(window.mappings || {}).forEach(data => {
                 if(data && Array.isArray(data.drawers)) data.drawers.forEach(d => usedDrawers.add(d));
             });
-            // UPDATE: Check up to 9999
             for (let i = 1; i <= 9999; i++) { 
                 if (!usedDrawers.has(`${i}`)) return i;
             }
@@ -596,6 +594,22 @@
             document.getElementById('drawer-num').value = num;
             document.getElementById('drawer-sub').checked = isSub;
             updateDrawerString();
+        }
+
+        // --- NEW: Duplicate Check Logic ---
+        function checkExistingLocation(partId) {
+            const warningBox = document.getElementById('encode-duplicate-warning');
+            const warningText = document.getElementById('encode-duplicate-text');
+            
+            const partData = (window.mappings || {})[partId];
+            const drawers = partData ? partData.drawers : [];
+
+            if (drawers.length > 0) {
+                warningText.textContent = `此零件已存在於：抽屜 ${drawers.join(', ')}`;
+                warningBox.classList.remove('hidden');
+            } else {
+                warningBox.classList.add('hidden');
+            }
         }
 
         function resizeImage(file, maxWidth = 800) {
@@ -635,8 +649,10 @@
             const prompt = `
                 You are an expert Lego part identifier. Analyze this image.
                 1. Identify the main building block/part.
-                2. If it is a standard Lego part, return its official Design ID (e.g., "3001").
-                3. If it is a non-standard, compatible brand, or unidentifiable part, create a descriptive ID (e.g., "BRICK_2X4_MODIFIED", "WHEEL_LARGE", "AXLE_01").
+                2. If it is a standard Lego part, return its official Design ID (e.g., "3001") and standard name.
+                3. If it is a non-standard, compatible brand (like CaDA, Sembo, Double Eagle), or specific Technic part:
+                   - Create a descriptive ID (e.g., "CADA_GEARBOX").
+                   - In the "name" field, include both the English description AND common Chinese product keywords found on Taobao (e.g., "雙鷹CaDA兼容樂高6588減速齒輪箱").
                 4. Return the result strictly as a JSON object with keys "id" and "name".
                 5. DO NOT output markdown code blocks. DO NOT output any conversational text.
                 
@@ -719,6 +735,7 @@
                     document.getElementById('encode-api-img').classList.add('hidden');
                     document.getElementById('encode-retry-gemini').classList.add('hidden');
 
+                    checkExistingLocation(partId); // Check on retry success
                     document.getElementById('encode-actions').classList.remove('hidden');
                 }
 
@@ -838,6 +855,7 @@
                         actionImg.classList.add('hidden');
                     }
 
+                    checkExistingLocation(partId); // Call here!
                     document.getElementById('encode-actions').classList.remove('hidden');
                 }
 
@@ -855,8 +873,13 @@
             const newId = document.getElementById(inputId).value.trim();
             if (!newId) return;
             currentPartId = newId;
-            if (mode === 'find') document.getElementById('find-refresh-btn').classList.remove('hidden');
-            else showMessage(`ID 已修改為: ${newId}`, "success");
+            
+            if (mode === 'find') {
+                document.getElementById('find-refresh-btn').classList.remove('hidden');
+            } else {
+                showMessage(`ID 已修改為: ${newId}`, "success");
+                checkExistingLocation(newId); // Check on manual update
+            }
         }
 
         function refreshFindResult() {
@@ -932,6 +955,7 @@
                 document.getElementById('encode-preview').classList.add('hidden');
                 document.getElementById('encode-preview-container').querySelector('i').classList.remove('hidden');
                 document.getElementById('encode-actions').classList.add('hidden');
+                document.getElementById('encode-duplicate-warning').classList.add('hidden'); // Clear warning
                 currentPartId = null;
                 document.getElementById('encode-part-id-input').value = "---";
                 setTimeout(() => findNextEmptyDrawer(true), 500);
