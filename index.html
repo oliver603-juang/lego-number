@@ -18,7 +18,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, arrayUnion, arrayRemove, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, arrayUnion, arrayRemove, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Config ---
         const fallbackConfig = {
@@ -45,7 +45,7 @@
             if (!auth) return;
             onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    document.getElementById('cloud-status').innerHTML = '<span class="text-green-600"><i class="fa-solid fa-cloud"></i></span>';
+                    document.getElementById('cloud-status').innerHTML = '<i class="fa-solid fa-cloud text-green-500"></i>';
                     startSync(user);
                 } else {
                     signInAnonymously(auth);
@@ -84,19 +84,21 @@
             try {
                 const docSnap = await getDoc(docRef);
                 if (mode === 'move') { // 覆蓋 (移動)
+                    // 如果原本存在，保留圖片和名稱，只覆蓋 drawers
+                    const oldData = docSnap.exists() ? docSnap.data() : {};
                     await (docSnap.exists() ? updateDoc : setDoc)(docRef, {
                         part_id: partId,
-                        drawers: [drawerId],
-                        part_name: partName,
-                        img_url: imgUrl ? imgUrl : (docSnap.exists() ? docSnap.data().img_url : ""),
+                        drawers: [drawerId], // 覆蓋為新位置
+                        part_name: partName || oldData.part_name || "",
+                        img_url: imgUrl ? imgUrl : (oldData.img_url || ""),
                         updated_at: new Date().toISOString()
                     });
                 } else { // 新增 (Append)
                     if (docSnap.exists()) {
                         await updateDoc(docRef, {
                             drawers: arrayUnion(drawerId),
-                            part_name: partName,
-                            img_url: imgUrl ? imgUrl : docSnap.data().img_url,
+                            part_name: partName || docSnap.data().part_name,
+                            img_url: imgUrl ? imgUrl : docSnap.data().img_url, // 優先使用新圖，若無則保留舊圖
                             updated_at: new Date().toISOString()
                         });
                     } else {
@@ -146,8 +148,7 @@
         body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* 避免鍵盤遮擋 */
-        .pb-keypad { padding-bottom: 300px; }
+        .pb-keypad { padding-bottom: 350px; } /* 鍵盤防遮擋緩衝區 */
         ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
@@ -157,8 +158,8 @@
     <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-50">
         <div class="flex justify-between items-center max-w-md mx-auto">
             <h1 class="text-xl font-bold"><i class="fa-solid fa-cubes mr-2"></i>樂高管家</h1>
-            <div class="flex items-center space-x-3">
-                <div id="cloud-status" class="text-xs font-bold opacity-80">...</div>
+            <div class="flex items-center space-x-4">
+                <div id="cloud-status" class="text-xs">...</div>
                 <button onclick="toggleSettings()" class="hover:text-blue-200"><i class="fa-solid fa-gear text-xl"></i></button>
             </div>
         </div>
@@ -167,103 +168,111 @@
     <!-- Main Content -->
     <main id="main-content" class="flex-grow p-4 max-w-md mx-auto w-full pb-24 transition-all">
         
-        <!-- 1. 搜尋/辨識區 -->
+        <!-- 1. 統一搜尋區 -->
         <div class="bg-white p-6 rounded-xl shadow-lg text-center mb-6">
             <div class="mb-4 relative group cursor-pointer" onclick="document.getElementById('camera-input').click()">
-                <div id="preview-container" class="w-full h-48 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative">
+                <div id="preview-container" class="w-full h-40 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative transition hover:border-blue-400 hover:bg-blue-50">
                     <div class="text-gray-400 flex flex-col items-center">
                         <i class="fa-solid fa-camera text-4xl mb-2"></i>
-                        <span class="text-sm">拍照辨識</span>
+                        <span class="text-sm font-bold">點擊拍照辨識</span>
                     </div>
                     <img id="preview-img" class="absolute inset-0 w-full h-full object-contain hidden" />
                 </div>
             </div>
             <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleImage(this)">
 
-            <!-- Loading -->
             <div id="loading" class="hidden flex flex-col items-center justify-center py-4">
                 <div class="loader mb-2"></div>
-                <span id="loading-text" class="text-xs text-gray-500">正在辨識...</span>
+                <span id="loading-text" class="text-xs text-gray-500">處理中...</span>
             </div>
 
             <!-- Manual Input -->
-            <div class="flex items-center border-b-2 border-gray-200 focus-within:border-blue-500 py-1 px-2">
-                <i class="fa-solid fa-magnifying-glass text-gray-400 mr-2"></i>
-                <input type="text" id="part-id-input" class="flex-1 bg-transparent outline-none font-mono font-bold text-lg text-gray-700" placeholder="或輸入零件 ID" onchange="manualSearch()">
-                <button id="retry-btn" onclick="retryWithGemini()" class="hidden text-xs bg-red-100 text-red-600 px-2 py-1 rounded ml-2 font-bold">重試</button>
+            <div class="flex items-center border-b-2 border-gray-200 focus-within:border-blue-500 py-2 px-2 mt-2">
+                <i class="fa-solid fa-keyboard text-gray-400 mr-3"></i>
+                <input type="text" id="part-id-input" class="flex-1 bg-transparent outline-none font-mono font-bold text-lg text-gray-700 placeholder-gray-300" placeholder="手動輸入 ID" onchange="manualSearch()">
+                <button id="retry-btn" onclick="retryWithGemini()" class="hidden text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full ml-2 font-bold flex items-center">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Gemini
+                </button>
             </div>
         </div>
 
-        <!-- 2. 結果顯示與操作區 (動態切換) -->
+        <!-- 2. 結果與操作區 (動態內容) -->
         <div id="result-area" class="hidden space-y-4">
             
-            <!-- 零件資訊卡 -->
-            <div class="bg-white p-4 rounded-xl shadow-lg border-l-4 border-gray-300" id="info-card">
-                <div class="flex items-start">
-                    <img id="api-img" src="" class="w-16 h-16 object-contain bg-gray-50 rounded border border-gray-200 mr-3 hidden">
+            <!-- 資訊卡 -->
+            <div class="bg-white p-4 rounded-xl shadow-lg border-l-4" id="info-card">
+                <!-- 頭部資訊 -->
+                <div class="flex items-start mb-4">
+                    <img id="api-img" src="" class="w-20 h-20 object-contain bg-gray-50 rounded border border-gray-200 mr-4 hidden">
                     <div class="flex-1 min-w-0">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-2xl font-bold font-mono text-gray-800" id="res-part-id">---</h2>
-                            <span id="res-source" class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Source</span>
+                        <div class="flex justify-between items-start">
+                            <h2 class="text-3xl font-black font-mono text-gray-800 leading-none" id="res-part-id">---</h2>
+                            <span id="res-source" class="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 font-bold">SRC</span>
                         </div>
-                        <p class="text-sm text-gray-500 truncate" id="res-part-name">---</p>
+                        <p class="text-sm text-gray-500 mt-1 leading-tight break-words" id="res-part-name">---</p>
                     </div>
                 </div>
 
-                <!-- 狀態 A: 已存在 (顯示位置 + 操作) -->
-                <div id="status-exist" class="hidden mt-4 pt-4 border-t border-gray-100">
-                    <p class="text-sm text-gray-500 mb-2">目前位置：</p>
-                    <div id="drawer-list" class="flex flex-wrap gap-2 mb-4">
-                        <!-- Drawer Tags injected here -->
+                <!-- 狀態 A: 已存在 (顯示位置 + 操作按鈕) -->
+                <div id="status-exist" class="hidden">
+                    <div class="mb-4">
+                        <p class="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Current Location</p>
+                        <div id="drawer-list" class="flex flex-wrap gap-2">
+                            <!-- Tags go here -->
+                        </div>
                     </div>
                     
-                    <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <div class="text-xs font-bold text-gray-500 mb-2">管理操作：</div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button onclick="showActionPanel('add')" class="bg-white border border-blue-200 text-blue-600 py-2 rounded shadow-sm font-bold text-sm hover:bg-blue-50">
-                                <i class="fa-solid fa-plus mr-1"></i> 新增位置
-                            </button>
-                            <button onclick="showActionPanel('move')" class="bg-white border border-red-200 text-red-600 py-2 rounded shadow-sm font-bold text-sm hover:bg-red-50">
-                                <i class="fa-solid fa-arrow-right-arrow-left mr-1"></i> 移動位置
-                            </button>
-                        </div>
+                    <!-- 按鈕群 -->
+                    <div class="grid grid-cols-2 gap-3" id="exist-actions">
+                        <button onclick="showActionPanel('add')" class="bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-lg font-bold text-sm hover:bg-blue-100 flex justify-center items-center">
+                            <i class="fa-solid fa-plus-circle mr-2 text-lg"></i> 新增位置
+                        </button>
+                        <button onclick="showActionPanel('move')" class="bg-red-50 border border-red-200 text-red-700 py-3 rounded-lg font-bold text-sm hover:bg-red-100 flex justify-center items-center">
+                            <i class="fa-solid fa-arrow-right-arrow-left mr-2 text-lg"></i> 移動位置
+                        </button>
                     </div>
                 </div>
 
-                <!-- 狀態 B: 未登錄 (直接顯示入庫) -->
-                <div id="status-new" class="hidden mt-4 pt-4 border-t border-gray-100">
-                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                        <p class="text-blue-800 font-bold mb-2 flex items-center">
-                            <i class="fa-solid fa-circle-exclamation mr-2"></i> 尚未登錄，立即入庫？
+                <!-- 狀態 B: 未登錄 (直接顯示入庫面板) -->
+                <div id="status-new" class="hidden">
+                    <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-200 mb-3">
+                        <p class="text-yellow-800 font-bold text-sm flex items-center">
+                            <i class="fa-solid fa-triangle-exclamation mr-2"></i> 尚未登錄，設定新位置：
                         </p>
-                        <!-- 嵌入操作面板 (預設為 Add 模式) -->
-                        <div id="inline-action-panel"></div> 
                     </div>
+                    <!-- 面板容器 -->
+                    <div id="inline-action-panel"></div> 
                 </div>
+
+                <!-- 動態操作面板容器 (for Exist mode) -->
+                <div id="dynamic-action-area" class="mt-4 hidden border-t border-gray-100 pt-4"></div>
             </div>
 
-            <!-- 操作面板 (輸入抽屜號) -->
-            <!-- 透過 JS 移動到 status-exist 或 status-new 內 -->
+            <!-- 操作面板模板 (隱藏) -->
             <div id="action-panel-template" class="hidden">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="text-sm text-gray-600 font-bold" id="action-label">抽屜號碼：</span>
-                    <input type="text" id="drawer-input" class="w-20 p-2 border-2 border-blue-500 rounded text-center text-xl font-bold bg-white cursor-pointer" readonly onclick="openKeypad('drawer-input')">
+                <div class="flex flex-col gap-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold text-gray-700" id="action-label">目標抽屜：</span>
+                        <div class="flex items-center gap-2">
+                             <button onclick="adjustDrawer(-1)" class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 flex items-center justify-center text-lg shadow-sm"><i class="fa-solid fa-minus"></i></button>
+                             
+                             <input type="text" id="drawer-input" class="w-24 p-2 border-2 border-blue-500 rounded-lg text-center text-2xl font-black text-blue-700 bg-white cursor-pointer shadow-inner" readonly onclick="openKeypad('drawer-input')">
+                             
+                             <button onclick="adjustDrawer(1)" class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 flex items-center justify-center text-lg shadow-sm"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
                     
-                    <label class="flex items-center space-x-1 cursor-pointer bg-white px-2 py-2 rounded border">
-                        <input type="checkbox" id="drawer-sub" class="w-4 h-4 accent-blue-600">
-                        <span class="text-sm font-bold">a</span>
-                    </label>
-                </div>
-                
-                <!-- 抽屜調整按鈕 -->
-                <div class="flex gap-2 mb-3">
-                    <button onclick="adjustDrawer(-1)" class="flex-1 bg-gray-200 rounded py-1 text-gray-600 font-bold hover:bg-gray-300">-</button>
-                    <button onclick="adjustDrawer(1)" class="flex-1 bg-gray-200 rounded py-1 text-gray-600 font-bold hover:bg-gray-300">+</button>
-                </div>
+                    <div class="flex items-center justify-end gap-2 mb-1">
+                        <label class="flex items-center space-x-2 cursor-pointer select-none">
+                            <input type="checkbox" id="drawer-sub" class="w-5 h-5 accent-blue-600 rounded">
+                            <span class="text-sm font-bold text-gray-500">夾層 a</span>
+                        </label>
+                    </div>
 
-                <button id="confirm-btn" class="w-full py-3 rounded-lg font-bold text-white shadow transition-transform active:scale-95 flex justify-center items-center">
-                    <span>確認</span>
-                </button>
+                    <button id="confirm-btn" class="w-full py-3.5 rounded-xl font-bold text-white shadow-md transition-all active:scale-95 text-lg flex justify-center items-center">
+                        確認
+                    </button>
+                </div>
             </div>
 
         </div>
@@ -271,49 +280,54 @@
 
     <!-- Keypad Modal -->
     <div id="keypad-modal" class="fixed inset-0 z-[70] hidden flex items-end justify-center pointer-events-none">
-        <div class="bg-white w-full max-w-md shadow-[0_-4px_20px_rgba(0,0,0,0.15)] rounded-t-2xl p-4 pointer-events-auto transform transition-transform duration-300 translate-y-full" id="keypad-content">
-            <div class="flex justify-between items-center mb-3">
-                <span class="text-gray-500 font-bold text-sm">輸入號碼</span>
-                <button onclick="closeKeypad()" class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full"><i class="fa-solid fa-chevron-down"></i></button>
+        <div class="bg-white w-full max-w-md shadow-[0_-10px_40px_rgba(0,0,0,0.2)] rounded-t-3xl p-5 pointer-events-auto transform transition-transform duration-300 translate-y-full" id="keypad-content">
+            <div class="flex justify-between items-center mb-4">
+                <span class="text-gray-400 font-bold text-sm tracking-wider uppercase">Keypad</span>
+                <button onclick="closeKeypad()" class="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200"><i class="fa-solid fa-chevron-down"></i></button>
             </div>
-            <div class="grid grid-cols-4 gap-2">
-                <button onclick="k('1')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">1</button>
-                <button onclick="k('2')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">2</button>
-                <button onclick="k('3')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">3</button>
-                <button onclick="k('del')" class="bg-red-50 border border-red-100 rounded p-3 text-red-500 active:bg-red-100"><i class="fa-solid fa-delete-left"></i></button>
-                <button onclick="k('4')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">4</button>
-                <button onclick="k('5')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">5</button>
-                <button onclick="k('6')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">6</button>
-                <button onclick="k('ok')" class="bg-blue-600 rounded p-3 text-white font-bold row-span-3 flex items-center justify-center shadow active:bg-blue-700">OK</button>
-                <button onclick="k('7')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">7</button>
-                <button onclick="k('8')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">8</button>
-                <button onclick="k('9')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">9</button>
-                <button onclick="k('clr')" class="bg-gray-200 border border-gray-300 rounded p-3 text-xs font-bold active:bg-gray-300">CLR</button>
-                <button onclick="k('0')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold col-span-2 active:bg-blue-50">0</button>
+            <div class="grid grid-cols-3 gap-3">
+                <button onclick="k('1')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">1</button>
+                <button onclick="k('2')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">2</button>
+                <button onclick="k('3')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">3</button>
+                
+                <button onclick="k('4')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">4</button>
+                <button onclick="k('5')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">5</button>
+                <button onclick="k('6')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">6</button>
+                
+                <button onclick="k('7')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">7</button>
+                <button onclick="k('8')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">8</button>
+                <button onclick="k('9')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">9</button>
+                
+                <button onclick="k('del')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-xl font-bold active:border-b-0 active:translate-y-1 transition-all"><i class="fa-solid fa-delete-left"></i></button>
+                <button onclick="k('0')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">0</button>
+                <button onclick="k('ok')" class="bg-blue-600 border-b-4 border-blue-800 rounded-xl p-3 text-white text-xl font-bold active:border-b-0 active:translate-y-1 transition-all">OK</button>
             </div>
         </div>
     </div>
 
     <!-- Settings Modal -->
-    <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 z-[80] flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-sm">
-            <h3 class="font-bold mb-4">設定</h3>
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 class="font-bold text-xl mb-4 text-gray-800">設定</h3>
             <div class="mb-4">
-                <label class="block text-xs text-gray-500">Gemini API Key</label>
-                <input type="password" id="gemini-key" class="w-full border rounded p-2">
+                <label class="block text-xs font-bold text-gray-500 mb-1">Gemini API Key</label>
+                <input type="password" id="gemini-key" class="w-full border-2 border-gray-200 rounded-lg p-2 focus:border-blue-500 outline-none">
             </div>
-            <div class="mb-4">
-                <label class="block text-xs text-gray-500">Model</label>
-                <select id="gemini-model" class="w-full border rounded p-2">
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-gray-500 mb-1">AI Model</label>
+                <select id="gemini-model" class="w-full border-2 border-gray-200 rounded-lg p-2 bg-white">
                     <option value="gemini-1.5-flash">1.5 Flash (推薦)</option>
                     <option value="gemini-1.5-pro">1.5 Pro</option>
                     <option value="gemini-2.0-flash-exp">2.0 Flash Exp</option>
                 </select>
             </div>
-            <button onclick="window.clearAllCloudData()" class="w-full text-red-500 border border-red-200 p-2 rounded mb-4 text-xs font-bold">清空所有資料</button>
-            <div class="flex justify-end gap-2">
-                <button onclick="toggleSettings()" class="px-4 py-2 text-gray-500">取消</button>
-                <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 text-white rounded">儲存</button>
+            <hr class="border-gray-100 mb-4">
+            <button onclick="window.clearAllCloudData()" class="w-full text-red-500 border border-red-200 bg-red-50 p-3 rounded-lg mb-4 text-sm font-bold hover:bg-red-100 transition">
+                <i class="fa-solid fa-trash-can mr-2"></i> 清空所有資料
+            </button>
+            <div class="flex justify-end gap-3">
+                <button onclick="toggleSettings()" class="px-5 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg">取消</button>
+                <button onclick="saveSettings()" class="px-5 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700">儲存</button>
             </div>
         </div>
     </div>
@@ -330,7 +344,14 @@
         let geminiApiKey = localStorage.getItem('lego_gemini_key') || "";
         let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-1.5-flash";
 
-        // --- Logic ---
+        // Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js');
+            });
+        }
+
+        // --- Core Logic ---
         function getNextEmptyDrawerId() {
             const used = new Set();
             Object.values(window.mappings || {}).forEach(d => {
@@ -356,53 +377,49 @@
             else { img.classList.add('hidden'); }
 
             document.getElementById('result-area').classList.remove('hidden');
+            
+            // UI State Switch
+            const infoCard = document.getElementById('info-card');
+            const statusExist = document.getElementById('status-exist');
+            const statusNew = document.getElementById('status-new');
+            const dynamicArea = document.getElementById('dynamic-action-area');
+            const existActions = document.getElementById('exist-actions');
 
             if(drawers.length > 0) {
                 // 情境 A: 已存在
-                document.getElementById('status-exist').classList.remove('hidden');
-                document.getElementById('status-new').classList.add('hidden');
-                document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-4 border-green-500"; // Green border
+                statusExist.classList.remove('hidden');
+                statusNew.classList.add('hidden');
+                dynamicArea.innerHTML = ''; // 清空動態區
+                dynamicArea.classList.add('hidden');
+                existActions.classList.remove('hidden'); // 顯示按鈕
+                infoCard.className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-green-500 transition-all"; 
                 
-                // Render Tags
+                // Tags
                 const list = document.getElementById('drawer-list');
                 list.innerHTML = drawers.map(d => 
-                    `<div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-bold shadow-sm flex items-center">
-                        <i class="fa-solid fa-box-open mr-2 text-xs"></i>${d}
-                        <button onclick="removeLoc('${d}')" class="ml-2 text-blue-400 hover:text-red-500"><i class="fa-solid fa-xmark"></i></button>
+                    `<div class="bg-green-50 border border-green-200 text-green-800 px-3 py-1.5 rounded-lg font-bold shadow-sm flex items-center">
+                        <i class="fa-solid fa-box-open mr-2 text-xs opacity-50"></i>${d}
+                        <button onclick="removeLoc('${d}')" class="ml-3 w-5 h-5 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm transition"><i class="fa-solid fa-xmark text-xs"></i></button>
                      </div>`
                 ).join('');
-
-                // Clear inline panel if it was here
-                document.getElementById('inline-action-panel').innerHTML = '';
             } else {
                 // 情境 B: 新零件
-                document.getElementById('status-exist').classList.add('hidden');
-                document.getElementById('status-new').classList.remove('hidden');
-                document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-4 border-yellow-400"; // Yellow border
+                statusExist.classList.add('hidden');
+                statusNew.classList.remove('hidden');
+                infoCard.className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-yellow-400 transition-all"; 
 
-                // 自動將操作面板移入 status-new，並設為 'add' 模式
+                // 直接嵌入操作面板
                 setupActionPanel('add', document.getElementById('inline-action-panel'));
-                
-                // 預設填入下一個空位
                 document.getElementById('drawer-input').value = getNextEmptyDrawerId();
             }
         }
 
         // --- Action Panel Logic ---
         window.showActionPanel = (action) => {
-            // 點擊新增或移動時，我們在 status-exist 下方動態插入面板
-            const container = document.getElementById('status-exist');
-            let panelContainer = document.getElementById('dynamic-action-area');
-            
-            if(!panelContainer) {
-                panelContainer = document.createElement('div');
-                panelContainer.id = 'dynamic-action-area';
-                panelContainer.className = "mt-4 pt-4 border-t border-gray-100";
-                container.appendChild(panelContainer);
-            }
-            
-            setupActionPanel(action, panelContainer);
-            // 預設填入空位
+            const container = document.getElementById('dynamic-action-area');
+            container.classList.remove('hidden');
+            document.getElementById('exist-actions').classList.add('hidden'); // 隱藏按鈕群，顯示面板
+            setupActionPanel(action, container);
             document.getElementById('drawer-input').value = getNextEmptyDrawerId();
         };
 
@@ -415,29 +432,32 @@
             const label = container.querySelector('#action-label');
             
             if (action === 'add') {
-                btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                btn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'text-white');
                 btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i> 確認加入';
-                label.textContent = "加入到抽屜：";
+                label.textContent = "加入位置：";
             } else {
-                btn.classList.add('bg-red-500', 'hover:bg-red-600');
+                btn.classList.add('bg-red-500', 'hover:bg-red-600', 'text-white');
                 btn.innerHTML = '<i class="fa-solid fa-arrow-right-arrow-left mr-2"></i> 確認移動 (覆蓋)';
-                label.textContent = "移動到抽屜：";
+                label.textContent = "移動至：";
             }
 
-            // Bind events for the new elements
+            // Re-bind Keypad Event (Clone lost event listeners)
             const input = container.querySelector('#drawer-input');
-            input.onclick = () => openKeypad(input.id); // Re-bind ID is tricky if duplicated, let's fix ID
+            input.id = 'drawer-input-active'; // Unique ID for active input
+            input.onclick = () => openKeypad('drawer-input-active');
             
-            // To avoid ID conflict, we rely on the fact that only one panel is active at a time
-            // Or we just use global access since we clear previous ones.
-            // But 'drawer-input' id is in template.
+            // Bind adjust buttons
+            const buttons = container.querySelectorAll('button');
+            // 我們假設結構固定，手動綁定 -1 和 +1
+            // 結構: div > div(flex) > button(-) input button(+)
+            // 這裡直接改用全域函數呼叫，透過 ID 抓取 active input
             
             // Bind confirm
-            btn.onclick = executeAction;
+            container.querySelector('#confirm-btn').onclick = executeAction;
         }
 
         window.adjustDrawer = (delta) => {
-            const input = document.getElementById('drawer-input'); // This gets the active one
+            const input = document.getElementById('drawer-input-active'); 
             if(!input) return;
             let val = parseInt(input.value) || 1;
             val += delta;
@@ -448,45 +468,48 @@
 
         window.executeAction = async () => {
             if(!currentPartId) return;
-            const num = document.getElementById('drawer-input').value;
-            const isSub = document.getElementById('drawer-sub').checked;
-            const targetDrawer = isSub ? `${num}a` : `${num}`;
+            const num = document.getElementById('drawer-input-active').value;
+            const isSub = document.getElementById('drawer-sub').checked; // template ID might be duplicated, querySelector safer
+            // FIX: query selector from active container
+            const activeContainer = document.getElementById('drawer-input-active').closest('#inline-action-panel') || document.getElementById('dynamic-action-area');
+            const isSubChecked = activeContainer.querySelector('input[type="checkbox"]').checked;
+
+            const targetDrawer = isSubChecked ? `${num}a` : `${num}`;
             
-            const btn = document.querySelector('#confirm-btn'); // Active button
+            const btn = activeContainer.querySelector('#confirm-btn'); 
             const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 處理中...';
+            const originalClass = btn.className;
+
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             btn.disabled = true;
 
             try {
                 if (currentAction === 'move') {
                     if(confirm(`確定將 ${currentPartId} 移動到 ${targetDrawer} 嗎？\n舊位置將被移除。`)) {
                         await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'move');
+                    } else {
+                        btn.innerHTML = originalHtml; btn.disabled = false; return;
                     }
                 } else {
                     await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'append');
                 }
                 
-                // 成功後
-                // 不自動跳號，保持原位
-                // 只要重新整理顯示，狀態就會更新 (e.g. 從 New 變 Exist)
-                // 這裡我們手動觸發一次顯示更新 (雖然 onSnapshot 會觸發，但為了流暢感)
-                // 等待 snapshot 比較好。
+                // 成功動畫
+                btn.className = "w-full py-3.5 rounded-xl font-bold text-white shadow-md bg-green-500 transition-all";
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> 成功';
                 
-                // 如果是在 "New" 狀態下加入，加入後應該清空 action panel 嗎？
-                // 為了連續作業，保留面板比較好，但要提示成功。
-                
-                // 簡單提示
-                const originalBg = btn.className;
-                btn.className = "w-full py-3 rounded-lg font-bold text-white shadow bg-green-500 transition-all";
-                btn.innerHTML = '<i class="fa-solid fa-check"></i> 成功！';
-                
+                // 不自動重置，等待下一次掃描
+                // 但要恢復按鈕狀態以便再次操作 (例如連續加同一個)
                 setTimeout(() => {
-                    btn.className = originalBg;
+                    btn.className = originalClass;
                     btn.innerHTML = originalHtml;
                     btn.disabled = false;
-                    // 如果是 New 模式，加入後其實變成了 Exist 模式，UI 會被 onSnapshot 重繪
-                    // 所以這裡不做太多 UI 重置
-                }, 1000);
+                    // 如果是在 "Exist" 模式下操作，完成後恢復顯示按鈕群
+                    if(document.getElementById('status-exist').classList.contains('hidden') === false) {
+                         document.getElementById('exist-actions').classList.remove('hidden');
+                         document.getElementById('dynamic-action-area').classList.add('hidden');
+                    }
+                }, 1500);
 
             } catch(e) {
                 btn.innerHTML = originalHtml;
@@ -500,8 +523,7 @@
             }
         };
 
-        // --- Standard Image & AI Handlers (Simplified) ---
-        // (Copied from previous versions logic but cleaner)
+        // --- Image & AI ---
         window.handleImage = async (input) => {
             if (!input.files[0]) return;
             const file = input.files[0];
@@ -512,28 +534,27 @@
             };
             reader.readAsDataURL(file);
             document.getElementById('loading').classList.remove('hidden');
-            document.getElementById('result-area').classList.add('hidden'); // Hide old result
+            document.getElementById('result-area').classList.add('hidden'); 
             
             try {
                 const blob = await resizeImage(file);
-                currentResizedBlob = blob; // For retry
+                currentResizedBlob = blob; 
                 
-                // 1. Brickognize
                 let result = await tryBrickognize(blob);
                 
-                // 2. Gemini Fallback
                 if (!result) {
                     if (geminiApiKey) {
-                        document.getElementById('loading-text').innerText = "切換至 Gemini AI...";
+                        document.getElementById('loading-text').innerText = "Brickognize 無結果，切換至 Gemini AI...";
                         result = await tryGemini(blob);
                     } else { throw new Error("Brickognize 無結果且未設定 API Key"); }
                 }
                 
                 currentPartName = result.name;
                 currentPartImgUrl = result.img;
-                document.getElementById('find-part-id-input').value = result.id;
-                
-                // 顯示結果
+                document.getElementById('part-id-input').value = result.id;
+                document.getElementById('res-source').textContent = result.source;
+                document.getElementById('res-source').className = `text-[10px] px-2 py-0.5 rounded font-bold text-white ${result.source==='Brickognize'?'bg-green-500':'bg-purple-500'}`;
+
                 checkAndDisplayDrawer(result.id);
                 document.getElementById('retry-btn').classList.remove('hidden');
 
@@ -541,31 +562,41 @@
                 alert(e.message);
             } finally {
                 document.getElementById('loading').classList.add('hidden');
+                document.getElementById('loading-text').innerText = "處理中...";
                 input.value = '';
             }
         };
         
         window.manualSearch = () => {
             const id = document.getElementById('part-id-input').value.trim();
-            if(id) checkAndDisplayDrawer(id);
+            if(id) {
+                currentPartName = ""; // Reset name on manual search
+                currentPartImgUrl = "";
+                document.getElementById('res-source').textContent = "MANUAL";
+                document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold";
+                checkAndDisplayDrawer(id);
+            }
         };
 
         window.retryWithGemini = async () => {
              if(!currentResizedBlob || !geminiApiKey) { alert("無圖片或未設定 Key"); return; }
              document.getElementById('loading').classList.remove('hidden');
              document.getElementById('loading-text').innerText = "Gemini 重試中...";
+             document.getElementById('result-area').classList.add('hidden');
              try {
                  const result = await tryGemini(currentResizedBlob);
                  currentPartName = result.name;
-                 currentPartImgUrl = ""; // Gemini usually no img url
-                 document.getElementById('find-part-id-input').value = result.id;
+                 currentPartImgUrl = ""; 
+                 document.getElementById('part-id-input').value = result.id;
+                 document.getElementById('res-source').textContent = "Gemini (Retry)";
+                 document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-purple-600 text-white font-bold";
                  checkAndDisplayDrawer(result.id);
              } catch(e) { alert(e.message); }
              finally { document.getElementById('loading').classList.add('hidden'); }
         };
 
         // --- Helpers ---
-        function resizeImage(file) { /* ... same as before ... */ 
+        function resizeImage(file) { 
             return new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.onload = (event) => {
@@ -612,9 +643,9 @@
             return { id: data.id, name: data.name, img: "", source: 'Gemini' };
         }
 
-        // --- Keypad (Simplified) ---
+        // --- Keypad ---
         window.k = (key) => {
-            const inp = document.getElementById('drawer-input'); // Always target the visible drawer-input
+            const inp = document.getElementById('drawer-input-active');
             if(!inp) return;
             if(key==='del') inp.value = inp.value.slice(0,-1);
             else if(key==='clr') inp.value = '';
@@ -627,7 +658,6 @@
             modal.classList.remove('hidden');
             requestAnimationFrame(() => content.classList.remove('translate-y-full'));
             document.getElementById('main-content').classList.add('pb-keypad');
-            // Scroll to ensure input visible
             setTimeout(() => document.getElementById(id).scrollIntoView({behavior:'smooth', block:'center'}), 300);
         };
         window.closeKeypad = () => {
@@ -636,13 +666,15 @@
             setTimeout(() => { modal.classList.add('hidden'); document.getElementById('main-content').classList.remove('pb-keypad'); }, 300);
         };
 
-        // Settings Toggles
+        // Settings
         window.toggleSettings = () => {
             const m = document.getElementById('settings-modal');
             m.classList.toggle('hidden');
             if(!m.classList.contains('hidden')) {
                 document.getElementById('gemini-key').value = geminiApiKey;
                 document.getElementById('gemini-model').value = geminiModel;
+                if(geminiApiKey) document.getElementById('key-saved-msg').classList.remove('hidden');
+                else document.getElementById('key-saved-msg').classList.add('hidden');
             }
         };
         window.saveSettings = () => {
@@ -658,22 +690,24 @@
     
     <!-- Keypad UI -->
     <div id="keypad-modal" class="fixed inset-0 z-[70] hidden flex items-end justify-center pointer-events-none">
-        <div class="bg-white w-full max-w-md shadow-2xl rounded-t-2xl p-4 pointer-events-auto transform transition-transform duration-300 translate-y-full" id="keypad-content">
-            <div class="flex justify-between mb-2"><span class="font-bold text-gray-500">輸入號碼</span><button onclick="closeKeypad()"><i class="fa-solid fa-chevron-down"></i></button></div>
-            <div class="grid grid-cols-4 gap-2">
-                <button onclick="k('1')" class="bg-gray-50 border rounded p-3 text-xl font-bold">1</button>
-                <button onclick="k('2')" class="bg-gray-50 border rounded p-3 text-xl font-bold">2</button>
-                <button onclick="k('3')" class="bg-gray-50 border rounded p-3 text-xl font-bold">3</button>
-                <button onclick="k('del')" class="bg-red-50 border border-red-200 rounded p-3 text-red-500"><i class="fa-solid fa-delete-left"></i></button>
-                <button onclick="k('4')" class="bg-gray-50 border rounded p-3 text-xl font-bold">4</button>
-                <button onclick="k('5')" class="bg-gray-50 border rounded p-3 text-xl font-bold">5</button>
-                <button onclick="k('6')" class="bg-gray-50 border rounded p-3 text-xl font-bold">6</button>
-                <button onclick="k('ok')" class="bg-blue-600 rounded p-3 text-white font-bold row-span-3 flex items-center justify-center">OK</button>
-                <button onclick="k('7')" class="bg-gray-50 border rounded p-3 text-xl font-bold">7</button>
-                <button onclick="k('8')" class="bg-gray-50 border rounded p-3 text-xl font-bold">8</button>
-                <button onclick="k('9')" class="bg-gray-50 border rounded p-3 text-xl font-bold">9</button>
-                <button onclick="k('clr')" class="bg-gray-200 border rounded p-3 text-xs font-bold">CLR</button>
-                <button onclick="k('0')" class="bg-gray-50 border rounded p-3 text-xl font-bold col-span-2">0</button>
+        <div class="bg-white w-full max-w-md shadow-[0_-10px_40px_rgba(0,0,0,0.2)] rounded-t-3xl p-5 pointer-events-auto transform transition-transform duration-300 translate-y-full" id="keypad-content">
+            <div class="flex justify-between items-center mb-4">
+                <span class="text-gray-400 font-bold text-sm tracking-wider uppercase">Keypad</span>
+                <button onclick="closeKeypad()" class="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200"><i class="fa-solid fa-chevron-down"></i></button>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <button onclick="k('1')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">1</button>
+                <button onclick="k('2')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">2</button>
+                <button onclick="k('3')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">3</button>
+                <button onclick="k('4')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">4</button>
+                <button onclick="k('5')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">5</button>
+                <button onclick="k('6')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">6</button>
+                <button onclick="k('7')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">7</button>
+                <button onclick="k('8')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">8</button>
+                <button onclick="k('9')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">9</button>
+                <button onclick="k('del')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-xl font-bold active:border-b-0 active:translate-y-1 transition-all"><i class="fa-solid fa-delete-left"></i></button>
+                <button onclick="k('0')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">0</button>
+                <button onclick="k('ok')" class="bg-blue-600 border-b-4 border-blue-800 rounded-xl p-3 text-white text-xl font-bold active:border-b-0 active:translate-y-1 transition-all">OK</button>
             </div>
         </div>
     </div>
