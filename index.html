@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂高抽屜管家 (即時查重版)</title>
+    <title>樂高抽屜管家 (鍵盤優化版)</title>
     
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -226,7 +226,7 @@
     <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 class="text-lg font-bold mb-4 flex items-center">
-                <i class="fa-solid fa-robot mr-2 text-blue-600"></i> AI 辨識設定
+                <i class="fa-solid fa-robot mr-2 text-blue-600"></i> 設定
             </h3>
             
             <div class="mb-6">
@@ -264,6 +264,37 @@
             <div class="flex justify-end space-x-2 border-t pt-4">
                 <button onclick="toggleSettings()" class="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded">取消</button>
                 <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">儲存設定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keypad Modal -->
+    <div id="keypad-modal" class="fixed inset-0 z-[70] hidden flex items-end justify-center pointer-events-none">
+        <div class="bg-white w-full max-w-md shadow-[0_-4px_20px_rgba(0,0,0,0.15)] rounded-t-2xl p-4 pointer-events-auto transform transition-transform duration-300 translate-y-full" id="keypad-content">
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-gray-500 font-bold text-sm">輸入抽屜號碼</span>
+                <button onclick="closeKeypad()" class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200">
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-4 gap-2">
+                <button onclick="appendKeypad('1')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">1</button>
+                <button onclick="appendKeypad('2')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">2</button>
+                <button onclick="appendKeypad('3')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">3</button>
+                <button onclick="backspaceKeypad()" class="bg-red-50 border border-red-100 rounded-lg p-3 text-red-500 active:bg-red-100"><i class="fa-solid fa-delete-left"></i></button>
+
+                <button onclick="appendKeypad('4')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">4</button>
+                <button onclick="appendKeypad('5')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">5</button>
+                <button onclick="appendKeypad('6')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">6</button>
+                <button onclick="confirmKeypad()" class="bg-blue-600 rounded-lg p-3 text-white font-bold row-span-3 flex items-center justify-center shadow-md active:bg-blue-700">OK</button>
+
+                <button onclick="appendKeypad('7')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">7</button>
+                <button onclick="appendKeypad('8')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">8</button>
+                <button onclick="appendKeypad('9')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">9</button>
+                
+                <button onclick="clearKeypad()" class="bg-gray-200 border border-gray-300 rounded-lg p-3 text-gray-600 font-bold text-xs active:bg-gray-300">CLR</button>
+                <button onclick="appendKeypad('0')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold col-span-2 active:bg-blue-50">0</button>
             </div>
         </div>
     </div>
@@ -326,14 +357,18 @@
 
                     <div id="find-quick-assign" class="hidden mt-4 pt-4 border-t border-gray-300 bg-yellow-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-lg">
                         <p class="text-sm text-yellow-800 font-bold mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 未找到！立即指定位置：</p>
+                        
                         <div class="flex items-center space-x-2 mb-3 justify-center bg-white p-2 rounded border border-gray-200 shadow-sm">
                             <span class="text-sm text-gray-600">抽屜</span>
-                            <input type="number" id="find-drawer-input" class="w-20 p-1 border rounded text-center font-bold text-lg" min="1" value="1">
+                            <!-- UPDATE: Added onclick/readonly for keypad -->
+                            <input type="text" id="find-drawer-input" class="w-20 p-1 border rounded text-center font-bold text-lg cursor-pointer bg-white" min="1" value="1" readonly onclick="openKeypad('find-drawer-input')">
+                            
                             <label class="flex items-center space-x-1 cursor-pointer bg-gray-50 px-2 py-1 rounded border">
                                 <input type="checkbox" id="find-drawer-sub" class="w-4 h-4 accent-blue-600">
                                 <span class="text-sm font-bold">夾層 a</span>
                             </label>
                         </div>
+                        
                         <button onclick="saveFromFindMode()" class="w-full bg-yellow-500 text-white py-2 rounded-lg font-bold shadow hover:bg-yellow-600 active:scale-95 transition-transform flex justify-center items-center">
                             <i class="fa-solid fa-plus-circle mr-2"></i> 儲存對應關係
                         </button>
@@ -344,7 +379,9 @@
                          <div id="quick-add-panel" class="hidden mt-2 bg-blue-50 p-3 rounded">
                             <div class="flex items-center space-x-2 mb-2 justify-center">
                                 <span class="text-sm text-gray-600">新增抽屜</span>
-                                <input type="number" id="add-drawer-input" class="w-16 p-1 border rounded text-center" min="1" value="1">
+                                <!-- UPDATE: Added onclick/readonly for keypad -->
+                                <input type="text" id="add-drawer-input" class="w-16 p-1 border rounded text-center cursor-pointer bg-white" min="1" value="1" readonly onclick="openKeypad('add-drawer-input')">
+                                
                                 <label class="flex items-center space-x-1">
                                     <input type="checkbox" id="add-drawer-sub" class="w-4 h-4 accent-blue-600">
                                     <span class="text-xs">a</span>
@@ -364,6 +401,8 @@
 
         <!-- MODE 2: ENCODE DRAWER -->
         <div id="mode-encode" class="hidden space-y-6">
+            
+            <!-- Drawer Navigation -->
             <div class="bg-white p-4 rounded-xl shadow-lg">
                 <div class="flex justify-between items-center mb-2">
                     <h2 class="text-lg font-bold text-gray-700">當前設定抽屜</h2>
@@ -371,18 +410,27 @@
                         <i class="fa-solid fa-forward mr-1"></i>跳至未編碼
                     </button>
                 </div>
+
                 <div class="flex items-center space-x-2">
-                    <button onclick="adjustDrawer(-1)" class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 text-gray-600"><i class="fa-solid fa-minus"></i></button>
+                    <button onclick="adjustDrawer(-1)" class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 text-gray-600">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+                    
                     <div class="flex-1 flex space-x-2">
-                        <!-- UPDATE: Max drawer number increased -->
-                        <input type="number" id="drawer-num" value="1" min="1" max="9999" class="w-full text-center text-2xl font-bold border-2 border-gray-300 rounded focus:border-blue-500 outline-none p-2" onchange="updateDrawerString()">
+                        <!-- UPDATE: Added onclick/readonly for keypad -->
+                        <input type="text" id="drawer-num" value="1" class="w-full text-center text-2xl font-bold border-2 border-gray-300 rounded focus:border-blue-500 outline-none p-2 cursor-pointer bg-white" readonly onclick="openKeypad('drawer-num')">
+                        
                         <label class="flex flex-col items-center justify-center p-2 border-2 border-gray-300 rounded cursor-pointer select-none bg-gray-50" id="sub-drawer-label">
                             <span class="text-xs text-gray-500 font-bold">夾層 a</span>
                             <input type="checkbox" id="drawer-sub" class="w-5 h-5 mt-1 accent-blue-600" onchange="updateDrawerString()">
                         </label>
                     </div>
-                    <button onclick="adjustDrawer(1)" class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 text-gray-600"><i class="fa-solid fa-plus"></i></button>
+
+                    <button onclick="adjustDrawer(1)" class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 text-gray-600">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
                 </div>
+                
                 <div class="text-center mt-2 text-gray-500 font-mono text-sm">
                     目前標記為: <span id="current-drawer-display" class="font-bold text-blue-600 text-lg">1</span>
                     <span id="drawer-status" class="ml-2 text-xs text-gray-400">(讀取中...)</span>
@@ -421,7 +469,6 @@
                         </div>
                         <div id="encode-part-name" class="text-xs text-gray-500 truncate mt-1"></div>
                         
-                        <!-- Duplicate Check UI (New) -->
                         <div id="encode-duplicate-warning" class="hidden mt-2 bg-blue-100 border border-blue-300 text-blue-800 p-2 rounded text-xs font-bold flex items-center justify-center">
                             <i class="fa-solid fa-circle-info mr-2"></i>
                             <span id="encode-duplicate-text"></span>
@@ -449,6 +496,7 @@
         let currentPartName = "";
         let currentPartImgUrl = ""; 
         let currentResizedBlob = null; 
+        let currentKeypadTarget = null; // Keypad Target
         
         let geminiApiKey = localStorage.getItem('lego_gemini_key') || "";
         let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-1.5-flash";
@@ -460,6 +508,65 @@
             });
         }
 
+        // --- Keypad Functions ---
+        function openKeypad(targetId) {
+            currentKeypadTarget = document.getElementById(targetId);
+            if(currentKeypadTarget) {
+                // Clear initial '1' if focused and clean entry desired, or keep logic?
+                // Usually keeping existing value is better, user can clear.
+                const modal = document.getElementById('keypad-modal');
+                const content = document.getElementById('keypad-content');
+                modal.classList.remove('hidden');
+                // Trigger animation
+                requestAnimationFrame(() => {
+                    content.classList.remove('translate-y-full');
+                });
+            }
+        }
+
+        function closeKeypad() {
+            const modal = document.getElementById('keypad-modal');
+            const content = document.getElementById('keypad-content');
+            content.classList.add('translate-y-full');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                currentKeypadTarget = null;
+            }, 300); // match duration
+        }
+
+        function appendKeypad(num) {
+            if (currentKeypadTarget) {
+                // If it's a number input logic (though type is text for readonly), 
+                // handle leading zero or empty
+                if (currentKeypadTarget.value === "0") currentKeypadTarget.value = "";
+                currentKeypadTarget.value += num;
+            }
+        }
+
+        function clearKeypad() {
+            if (currentKeypadTarget) currentKeypadTarget.value = "";
+        }
+
+        function backspaceKeypad() {
+            if (currentKeypadTarget) {
+                currentKeypadTarget.value = currentKeypadTarget.value.slice(0, -1);
+            }
+        }
+
+        function confirmKeypad() {
+            if (currentKeypadTarget) {
+                // If empty, set to 1 or 0? Set to 1 as safe default for drawers
+                if (currentKeypadTarget.value === "") currentKeypadTarget.value = "1";
+                
+                // If this was the drawer navigation input, trigger update logic
+                if (currentKeypadTarget.id === 'drawer-num') {
+                    updateDrawerString();
+                }
+            }
+            closeKeypad();
+        }
+
+        // ... existing functions ...
         function toggleSettings() {
             document.getElementById('settings-modal').classList.toggle('hidden');
             if (!document.getElementById('settings-modal').classList.contains('hidden')) {
@@ -528,7 +635,7 @@
             if (val < 1) val = 1;
             if (val > 9999) val = 9999; 
             input.value = val;
-            if (delta !== 0) document.getElementById('drawer-sub').checked = false;
+            // if (delta !== 0) document.getElementById('drawer-sub').checked = false; // Optional reset
             updateDrawerString();
         }
 
@@ -596,7 +703,6 @@
             updateDrawerString();
         }
 
-        // --- NEW: Duplicate Check Logic ---
         function checkExistingLocation(partId) {
             const warningBox = document.getElementById('encode-duplicate-warning');
             const warningText = document.getElementById('encode-duplicate-text');
@@ -735,7 +841,7 @@
                     document.getElementById('encode-api-img').classList.add('hidden');
                     document.getElementById('encode-retry-gemini').classList.add('hidden');
 
-                    checkExistingLocation(partId); // Check on retry success
+                    checkExistingLocation(partId); 
                     document.getElementById('encode-actions').classList.remove('hidden');
                 }
 
@@ -855,7 +961,7 @@
                         actionImg.classList.add('hidden');
                     }
 
-                    checkExistingLocation(partId); // Call here!
+                    checkExistingLocation(partId); 
                     document.getElementById('encode-actions').classList.remove('hidden');
                 }
 
@@ -878,7 +984,7 @@
                 document.getElementById('find-refresh-btn').classList.remove('hidden');
             } else {
                 showMessage(`ID 已修改為: ${newId}`, "success");
-                checkExistingLocation(newId); // Check on manual update
+                checkExistingLocation(newId);
             }
         }
 
@@ -955,10 +1061,11 @@
                 document.getElementById('encode-preview').classList.add('hidden');
                 document.getElementById('encode-preview-container').querySelector('i').classList.remove('hidden');
                 document.getElementById('encode-actions').classList.add('hidden');
-                document.getElementById('encode-duplicate-warning').classList.add('hidden'); // Clear warning
+                document.getElementById('encode-duplicate-warning').classList.add('hidden'); 
                 currentPartId = null;
                 document.getElementById('encode-part-id-input').value = "---";
-                setTimeout(() => findNextEmptyDrawer(true), 500);
+                // 移除自動跳號邏輯
+                // setTimeout(() => findNextEmptyDrawer(true), 500); 
             }
         }
 
