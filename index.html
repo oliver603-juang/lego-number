@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂高抽屜管家 (智慧推薦版)</title>
+    <title>樂高抽屜管家 (智慧預測版)</title>
     
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -40,7 +40,8 @@
         } catch (e) { console.error("Init Error", e); }
 
         window.mappings = {}; 
-        
+        window.searchIndex = []; 
+
         async function initApp() {
             if (!auth) return;
             onAuthStateChanged(auth, (user) => {
@@ -57,62 +58,37 @@
             const collRef = collection(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings');
             onSnapshot(collRef, (snapshot) => {
                 const newMappings = {};
+                const newIndex = [];
+
                 snapshot.forEach((doc) => {
                     const data = doc.data();
                     let drawers = [];
                     if (Array.isArray(data.drawers)) drawers = data.drawers;
                     else if (data.drawer_id) drawers = [data.drawer_id];
                     
+                    const partData = {
+                        drawers: drawers,
+                        name: data.part_name || "",
+                        img: data.img_url || "" 
+                    };
+
                     if (drawers.length > 0) {
-                        newMappings[doc.id] = {
-                            drawers: drawers,
-                            name: data.part_name || "",
-                            img: data.img_url || "" 
-                        };
+                        newMappings[doc.id] = partData;
+                        // Build Search Index
+                        newIndex.push({
+                            id: doc.id,
+                            name: partData.name,
+                            img: partData.img,
+                            // Pre-compute lowercase string for fast search
+                            searchStr: `${doc.id} ${partData.name}`.toLowerCase()
+                        });
                     }
                 });
                 window.mappings = newMappings;
-                // 若當前有顯示結果，刷新顯示
+                window.searchIndex = newIndex;
+
                 if (currentPartId) checkAndDisplayDrawer(currentPartId);
             });
-        }
-
-        // --- Helper: Levenshtein Distance for Similarity ---
-        function levenshtein(a, b) {
-            if(a.length === 0) return b.length; 
-            if(b.length === 0) return a.length; 
-            var matrix = []; 
-            for(var i = 0; i <= b.length; i++){ matrix[i] = [i]; } 
-            for(var j = 0; j <= a.length; j++){ matrix[0][j] = j; } 
-            for(var i = 1; i <= b.length; i++){ 
-                for(var j = 1; j <= a.length; j++){ 
-                    if(b.charAt(i-1) == a.charAt(j-1)){ 
-                        matrix[i][j] = matrix[i-1][j-1]; 
-                    } else { 
-                        matrix[i][j] = Math.min(matrix[i-1][j-1] + 1, Math.min(matrix[i][j-1] + 1, matrix[i-1][j] + 1)); 
-                    } 
-                } 
-            } 
-            return matrix[b.length][a.length]; 
-        }
-
-        function findSimilarParts(targetName) {
-            if (!targetName) return [];
-            const candidates = [];
-            const target = targetName.toLowerCase();
-            
-            Object.entries(window.mappings).forEach(([id, data]) => {
-                if (data.name && data.drawers.length > 0) {
-                    const dist = levenshtein(target, data.name.toLowerCase());
-                    // 簡單過濾：如果名稱差異太大就不要顯示
-                    // 或者我們只取前三名，不設門檻
-                    candidates.push({ ...data, id, dist });
-                }
-            });
-
-            // 排序：距離越小越相似
-            candidates.sort((a, b) => a.dist - b.dist);
-            return candidates.slice(0, 3);
         }
 
         // --- Database Actions ---
@@ -121,7 +97,7 @@
             const docRef = doc(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings', partId);
             try {
                 const docSnap = await getDoc(docRef);
-                if (mode === 'move') { // 覆蓋 (移動)
+                if (mode === 'move') { 
                     const oldData = docSnap.exists() ? docSnap.data() : {};
                     await (docSnap.exists() ? updateDoc : setDoc)(docRef, {
                         part_id: partId,
@@ -130,7 +106,7 @@
                         img_url: imgUrl ? imgUrl : (oldData.img_url || ""),
                         updated_at: new Date().toISOString()
                     });
-                } else { // 新增 (Append)
+                } else { 
                     if (docSnap.exists()) {
                         await updateDoc(docRef, {
                             drawers: arrayUnion(drawerId),
@@ -187,6 +163,8 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .pb-keypad { padding-bottom: 350px; } 
         ::-webkit-scrollbar { width: 0px; background: transparent; }
+        /* 預測選單選中樣式 */
+        .suggestion-item.active { background-color: #ebf8ff; border-left: 4px solid #3b82f6; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen flex flex-col">
@@ -203,10 +181,10 @@
     </header>
 
     <!-- Main Content -->
-    <main id="main-content" class="flex-grow p-4 max-w-md mx-auto w-full pb-24 transition-all">
+    <main id="main-content" class="flex-grow p-4 max-w-md mx-auto w-full pb-24 transition-all relative">
         
         <!-- 1. 統一搜尋區 -->
-        <div class="bg-white p-6 rounded-xl shadow-lg text-center mb-6">
+        <div class="bg-white p-6 rounded-xl shadow-lg text-center mb-6 relative z-30">
             <div class="mb-4 relative group cursor-pointer" onclick="document.getElementById('camera-input').click()">
                 <div id="preview-container" class="w-full h-40 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative transition hover:border-blue-400 hover:bg-blue-50">
                     <div class="text-gray-400 flex flex-col items-center">
@@ -223,13 +201,19 @@
                 <span id="loading-text" class="text-xs text-gray-500">處理中...</span>
             </div>
 
-            <!-- Manual Input -->
-            <div class="flex items-center border-b-2 border-gray-200 focus-within:border-blue-500 py-2 px-2 mt-2">
-                <i class="fa-solid fa-keyboard text-gray-400 mr-3"></i>
-                <input type="text" id="part-id-input" class="flex-1 bg-transparent outline-none font-mono font-bold text-lg text-gray-700 placeholder-gray-300" placeholder="手動輸入 ID" onchange="manualSearch()">
-                <button id="retry-btn" onclick="retryWithGemini()" class="hidden text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full ml-2 font-bold flex items-center">
-                    <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Gemini
-                </button>
+            <!-- Manual Input with Enhanced Autocomplete -->
+            <div class="relative">
+                <div class="flex items-center border-b-2 border-gray-200 focus-within:border-blue-500 py-2 px-2 mt-2">
+                    <i class="fa-solid fa-keyboard text-gray-400 mr-3"></i>
+                    <input type="text" id="part-id-input" class="flex-1 bg-transparent outline-none font-mono font-bold text-lg text-gray-700 placeholder-gray-300" placeholder="輸入 ID 或關鍵字..." oninput="handleInputSearch(this.value)" onkeydown="handleSearchKeydown(event)" autocomplete="off">
+                    <button id="retry-btn" onclick="retryWithGemini()" class="hidden text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full ml-2 font-bold flex items-center">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Gemini
+                    </button>
+                </div>
+                <!-- Search Suggestions Dropdown -->
+                <div id="search-suggestions" class="absolute top-full left-0 right-0 bg-white shadow-xl rounded-b-xl border border-t-0 border-gray-200 max-h-72 overflow-y-auto hidden z-40">
+                    <!-- Items will be injected here -->
+                </div>
             </div>
         </div>
 
@@ -386,19 +370,151 @@
         let currentPartImgUrl = "";
         let currentResizedBlob = null;
         let currentKeypadTarget = null;
-        let currentAction = 'append'; // 'append' or 'move'
+        let currentAction = 'append'; 
         
         let geminiApiKey = localStorage.getItem('lego_gemini_key') || "";
         let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-1.5-flash";
 
-        // Service Worker
+        // Autocomplete Selection
+        let selectedSuggestionIndex = -1;
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js');
             });
         }
 
-        // --- Core Logic ---
+        // --- Search & Autocomplete Logic (Updated) ---
+        window.handleInputSearch = (value) => {
+            selectedSuggestionIndex = -1; // Reset selection
+            const suggestionsBox = document.getElementById('search-suggestions');
+            if (!value || value.length < 1) { // 允許單字搜尋
+                suggestionsBox.classList.add('hidden');
+                return;
+            }
+
+            const terms = value.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+            
+            // 智慧評分機制
+            const candidates = window.searchIndex.map(item => {
+                let score = 0;
+                const idLower = item.id.toLowerCase();
+                
+                // 1. ID 匹配 (權重最高)
+                if (idLower === value.toLowerCase()) score += 100;
+                else if (idLower.startsWith(value.toLowerCase())) score += 80;
+                else if (idLower.includes(value.toLowerCase())) score += 20;
+
+                // 2. 名稱匹配 (支援多關鍵字，例如 "plate red")
+                let allTermsMatch = true;
+                terms.forEach(term => {
+                    if (!item.searchStr.includes(term)) allTermsMatch = false;
+                });
+
+                if (allTermsMatch) {
+                    score += 10;
+                    // 如果名稱開頭符合，加分
+                    if (item.name.toLowerCase().startsWith(terms[0])) score += 30;
+                } else {
+                    if (score === 0) return null; // 完全不符合
+                }
+
+                return { ...item, score };
+            }).filter(item => item !== null && item.score > 0);
+
+            // 排序：分數高 -> 低
+            candidates.sort((a, b) => b.score - a.score);
+            const topMatches = candidates.slice(0, 8); // 顯示前8個
+
+            if (topMatches.length > 0) {
+                suggestionsBox.innerHTML = topMatches.map((m, index) => {
+                    // Highlight Logic
+                    const highlightedName = highlightText(m.name, value);
+                    const highlightedId = highlightText(m.id, value);
+
+                    return `
+                        <div id="suggestion-${index}" class="suggestion-item flex items-center p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors" onclick="selectSuggestion('${m.id}')">
+                            ${m.img ? `<img src="${m.img}" class="w-10 h-10 object-contain mr-3 bg-gray-50 rounded border">` : '<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-300"></i></div>'}
+                            <div class="overflow-hidden flex-1">
+                                <div class="font-bold font-mono text-blue-600 flex justify-between items-center">
+                                    <span>${highlightedId}</span>
+                                    <span class="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded">ID</span>
+                                </div>
+                                <div class="text-xs text-gray-500 truncate mt-0.5">${highlightedName}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                suggestionsBox.classList.remove('hidden');
+            } else {
+                suggestionsBox.classList.add('hidden');
+            }
+        };
+
+        function highlightText(text, query) {
+            if(!query) return text;
+            // 簡單的高亮：將輸入的字串用黃底標示 (case insensitive)
+            const terms = query.split(/\s+/).filter(t => t.length > 0);
+            let result = text;
+            terms.forEach(term => {
+                const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                result = result.replace(regex, '<span class="bg-yellow-200 text-gray-900 font-bold">$1</span>');
+            });
+            return result;
+        }
+
+        window.selectSuggestion = (id) => {
+            document.getElementById('part-id-input').value = id;
+            document.getElementById('search-suggestions').classList.add('hidden');
+            manualSearch();
+        };
+
+        window.handleSearchKeydown = (e) => {
+            const box = document.getElementById('search-suggestions');
+            if (box.classList.contains('hidden')) return;
+            
+            const items = box.querySelectorAll('.suggestion-item');
+            if (items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedSuggestionIndex++;
+                if (selectedSuggestionIndex >= items.length) selectedSuggestionIndex = 0;
+                updateSelectionStyle(items);
+                // Auto scroll
+                items[selectedSuggestionIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'});
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedSuggestionIndex--;
+                if (selectedSuggestionIndex < 0) selectedSuggestionIndex = items.length - 1;
+                updateSelectionStyle(items);
+                items[selectedSuggestionIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'});
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedSuggestionIndex > -1) {
+                    items[selectedSuggestionIndex].click();
+                } else {
+                    // Manual enter -> search directly
+                    manualSearch();
+                    box.classList.add('hidden');
+                }
+            } else if (e.key === 'Escape') {
+                box.classList.add('hidden');
+            }
+        };
+
+        function updateSelectionStyle(items) {
+            items.forEach((item, idx) => {
+                if (idx === selectedSuggestionIndex) {
+                    item.classList.add('active'); // CSS class for highlight
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+        // ... [Rest of the file remains unchanged: checkAndDisplayDrawer, handleImage, saveMapping, etc.] ...
+        
         function getNextEmptyDrawerId() {
             const used = new Set();
             Object.values(window.mappings || {}).forEach(d => {
@@ -492,9 +608,12 @@
 
                 // 嵌入入庫面板
                 setupActionPanel('add', document.getElementById('inline-action-panel'));
-                document.getElementById('drawer-input-active').value = getNextEmptyDrawerId(); // FIXED: Target active input
+                // Use default empty drawer
+                const defDrawer = getNextEmptyDrawerId();
+                const inp = document.getElementById('drawer-input-active');
+                if(inp) inp.value = defDrawer;
 
-                // 相似推薦 (Requirement #2)
+                // 相似推薦
                 const similarContainer = document.getElementById('similar-suggestions');
                 const similarList = document.getElementById('similar-list');
                 const suggestions = findSimilarParts(currentPartName || "");
@@ -523,18 +642,13 @@
             const isSub = dStr.includes('a');
             const num = dStr.replace('a', '');
             
-            // Find active input (either in inline or dynamic panel)
-            // But since suggestions only show in NEW status, it's inline-action-panel
-            // But to be safe, we target by ID and assume only one active
-            
-            // Re-targeting active elements
-            const input = document.getElementById('drawer-input-active') || document.getElementById('drawer-input'); // try active first
-            const checkbox = input.parentElement.parentElement.querySelector('input[type="checkbox"]');
+            const input = document.getElementById('drawer-input-active'); 
+            const activeContainer = input.closest('#inline-action-panel') || document.getElementById('dynamic-action-area');
+            const checkbox = activeContainer.querySelector('input[type="checkbox"]');
             
             if(input) input.value = num;
             if(checkbox) checkbox.checked = isSub;
             
-            // Optional: Scroll to confirm button or flash input
             input.scrollIntoView({behavior: 'smooth', block: 'center'});
         };
 
@@ -542,15 +656,15 @@
         window.showActionPanel = (action) => {
             const container = document.getElementById('dynamic-action-area');
             container.classList.remove('hidden');
-            document.getElementById('exist-actions').classList.add('hidden'); // 隱藏按鈕群
+            document.getElementById('exist-actions').classList.add('hidden'); 
             setupActionPanel(action, container);
-            document.getElementById('drawer-input-active').value = getNextEmptyDrawerId(); // FIXED: Target active input
+            document.getElementById('drawer-input-active').value = getNextEmptyDrawerId(); 
         };
 
         function setupActionPanel(action, container) {
             currentAction = action;
             const template = document.getElementById('action-panel-template');
-            container.innerHTML = template.innerHTML; // Clone
+            container.innerHTML = template.innerHTML; 
             
             const btn = container.querySelector('#confirm-btn');
             const label = container.querySelector('#action-label');
@@ -566,7 +680,7 @@
             }
 
             const input = container.querySelector('#drawer-input');
-            input.id = 'drawer-input-active'; // Unique ID for active input
+            input.id = 'drawer-input-active'; 
             input.onclick = () => openKeypad('drawer-input-active');
             
             container.querySelector('#confirm-btn').onclick = executeAction;
@@ -585,7 +699,6 @@
         window.executeAction = async () => {
             if(!currentPartId) return;
             const num = document.getElementById('drawer-input-active').value;
-            // Robust check for checkbox
             const activeContainer = document.getElementById('drawer-input-active').closest('#inline-action-panel') || document.getElementById('dynamic-action-area');
             const isSubChecked = activeContainer.querySelector('input[type="checkbox"]').checked;
 
@@ -685,6 +798,7 @@
                 currentPartImgUrl = "";
                 document.getElementById('res-source').textContent = "MANUAL";
                 document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold";
+                document.getElementById('search-suggestions').classList.add('hidden');
                 checkAndDisplayDrawer(id);
             }
         };
@@ -743,7 +857,8 @@
 
         async function tryGemini(blob) {
             const b64 = await new Promise(r => { const rd = new FileReader(); rd.onloadend = () => r(rd.result.split(',')[1]); rd.readAsDataURL(blob); });
-            const prompt = `Identify this Lego part. Return JSON: { "id": "PART_ID", "name": "Part Name" }.`;
+            const prompt = `Identify this Lego part. Return JSON: { "id": "PART_ID", "name": "Part Name" }. 
+            IMPORTANT: ALWAYS Append common Traditional Chinese keywords for this part (e.g., "Brick 2x4 基礎磚", "Technic Beam 科技臂", "Gear 齒輪").`;
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`, {
                 method:'POST', headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({ contents:[{parts:[{text:prompt}, {inline_data:{mime_type:"image/jpeg", data:b64}}]}], generationConfig:{responseMimeType:"application/json"} })
