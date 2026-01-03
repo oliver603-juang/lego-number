@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂高抽屜管家 (移動功能版)</title>
+    <title>樂高抽屜管家 (融合版)</title>
     
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -12,18 +12,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon-192.png">
 
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, arrayUnion, arrayRemove, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, arrayUnion, arrayRemove, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Configuration ---
+        // --- Firebase Config ---
         const fallbackConfig = {
           apiKey: "AIzaSyAXwfm45p417iStJ556rYxR-qsty6dSaXc",
           authDomain: "lego-number.firebaseapp.com",
@@ -33,7 +30,6 @@
           appId: "1:1041577725604:web:b46696cd0933d1a3602031",
           measurementId: "G-25BT9NGHW1"
         };
-
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : fallbackConfig;
         
         let app, auth, db;
@@ -41,9 +37,7 @@
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
-        } catch (e) {
-            console.error("Firebase Init Error:", e);
-        }
+        } catch (e) { console.error("Init Error", e); }
 
         window.mappings = {}; 
         
@@ -51,21 +45,16 @@
             if (!auth) return;
             onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    document.getElementById('cloud-status').innerHTML = '<span class="text-green-600"><i class="fa-solid fa-cloud"></i> 已連線</span>';
+                    document.getElementById('cloud-status').innerHTML = '<span class="text-green-600"><i class="fa-solid fa-cloud"></i></span>';
                     startSync(user);
                 } else {
-                    signInAnonymously(auth).catch((error) => {
-                        console.error("Auth failed:", error);
-                        document.getElementById('cloud-status').innerHTML = '<span class="text-red-500">連線失敗</span>';
-                    });
+                    signInAnonymously(auth);
                 }
             });
         }
 
         function startSync(user) {
-            const syncAppId = 'lego-number-app'; 
-            const collRef = collection(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings');
-            
+            const collRef = collection(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings');
             onSnapshot(collRef, (snapshot) => {
                 const newMappings = {};
                 snapshot.forEach((doc) => {
@@ -83,164 +72,82 @@
                     }
                 });
                 window.mappings = newMappings;
-                window.dispatchEvent(new Event('mappingsUpdated'));
-                
-                const status = document.getElementById('cloud-status');
-                if (status.innerText.includes("已連線")) {
-                    const originalHTML = status.innerHTML;
-                    status.innerHTML = '<span class="text-blue-500"><i class="fa-solid fa-rotate fa-spin"></i> 同步中...</span>';
-                    setTimeout(() => status.innerHTML = originalHTML, 1000);
-                }
+                // 若當前有顯示結果，刷新顯示
+                if (currentPartId) checkAndDisplayDrawer(currentPartId);
             });
         }
 
-        // Add (Append) Location
-        window.saveMappingCloud = async (partId, drawerId, partName, imgUrl) => {
+        // --- Database Actions ---
+        window.saveMappingCloud = async (partId, drawerId, partName, imgUrl, mode = 'append') => {
             if (!db) return;
-            const syncAppId = 'lego-number-app';
-            const docRef = doc(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings', partId);
+            const docRef = doc(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings', partId);
             try {
                 const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    await updateDoc(docRef, {
-                        drawers: arrayUnion(drawerId),
-                        part_name: partName,
-                        img_url: imgUrl ? imgUrl : (docSnap.data().img_url || ""), 
-                        updated_at: new Date().toISOString()
-                    });
-                } else {
-                    await setDoc(docRef, {
+                if (mode === 'move') { // 覆蓋 (移動)
+                    await (docSnap.exists() ? updateDoc : setDoc)(docRef, {
                         part_id: partId,
                         drawers: [drawerId],
                         part_name: partName,
-                        img_url: imgUrl || "", 
+                        img_url: imgUrl ? imgUrl : (docSnap.exists() ? docSnap.data().img_url : ""),
                         updated_at: new Date().toISOString()
                     });
+                } else { // 新增 (Append)
+                    if (docSnap.exists()) {
+                        await updateDoc(docRef, {
+                            drawers: arrayUnion(drawerId),
+                            part_name: partName,
+                            img_url: imgUrl ? imgUrl : docSnap.data().img_url,
+                            updated_at: new Date().toISOString()
+                        });
+                    } else {
+                        await setDoc(docRef, {
+                            part_id: partId,
+                            drawers: [drawerId],
+                            part_name: partName,
+                            img_url: imgUrl || "",
+                            updated_at: new Date().toISOString()
+                        });
+                    }
                 }
             } catch (e) {
-                console.error("Save Error:", e);
                 alert("儲存失敗: " + e.message);
-                throw e;
-            }
-        };
-
-        // Move (Overwrite/Replace) Location
-        window.moveMappingCloud = async (partId, drawerId, partName, imgUrl) => {
-            if (!db) return;
-            const syncAppId = 'lego-number-app';
-            const docRef = doc(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings', partId);
-            try {
-                // 直接設定 drawers 為新的單一陣列，覆蓋舊有位置
-                // 如果文件不存在，setDoc 會建立；如果存在，merge: true 會保留其他欄位但 drawers 我們要覆寫
-                // 為了確保 drawers 是乾淨的，我們先讀取確認
-                const docSnap = await getDoc(docRef);
-                
-                if (docSnap.exists()) {
-                     await updateDoc(docRef, {
-                        drawers: [drawerId], // 覆寫為只有新位置
-                        part_name: partName,
-                        img_url: imgUrl ? imgUrl : (docSnap.data().img_url || ""),
-                        updated_at: new Date().toISOString()
-                    });
-                } else {
-                    await setDoc(docRef, {
-                        part_id: partId,
-                        drawers: [drawerId],
-                        part_name: partName,
-                        img_url: imgUrl || "",
-                        updated_at: new Date().toISOString()
-                    });
-                }
-            } catch (e) {
-                console.error("Move Error:", e);
-                alert("移動失敗: " + e.message);
                 throw e;
             }
         };
 
         window.removeMappingCloud = async (partId, drawerIdToRemove) => {
             if (!db) return;
-            const syncAppId = 'lego-number-app';
             try {
-                const docRef = doc(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings', partId);
+                const docRef = doc(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings', partId);
                 await updateDoc(docRef, { drawers: arrayRemove(drawerIdToRemove) });
-            } catch (e) {
-                console.error("Delete Error:", e);
-                alert("刪除失敗");
-            }
+            } catch (e) { alert("刪除失敗"); }
         };
 
         window.clearAllCloudData = async () => {
-            if (!db) return;
-            if (!confirm("【嚴重警告】\n這將會清空雲端上「所有」的抽屜與零件對應資料！\n\n此操作無法復原，您確定要繼續嗎？")) return;
-            if (!confirm("再次確認：\n請確認您真的要刪除所有資料。\n\n按「確定」將立即開始刪除。")) return;
-
-            const btn = document.getElementById('clear-all-btn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 清空中...';
-            btn.disabled = true;
-
-            try {
-                const syncAppId = 'lego-number-app'; 
-                const collRef = collection(db, 'artifacts', syncAppId, 'public', 'data', 'lego_mappings');
-                const snapshot = await getDocs(collRef);
-
-                if (snapshot.empty) {
-                    alert("目前沒有資料可以清除。");
-                    return;
-                }
-
-                const batchSize = 500;
-                let batch = writeBatch(db);
-                let count = 0;
-                let totalDeleted = 0;
-
-                for (const doc of snapshot.docs) {
-                    batch.delete(doc.ref);
-                    count++;
-                    if (count >= batchSize) {
-                        await batch.commit();
-                        batch = writeBatch(db);
-                        totalDeleted += count;
-                        count = 0;
-                    }
-                }
-                if (count > 0) {
-                    await batch.commit();
-                    totalDeleted += count;
-                }
-
-                toggleSettings();
-                showMessage(`成功清空 ${totalDeleted} 筆零件資料`, "success");
-
-            } catch (e) {
-                console.error("Clear All Error:", e);
-                alert("清空失敗: " + e.message);
-            } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
+            if (!db || !confirm("【嚴重警告】確定要清空所有資料嗎？") || !confirm("再次確認：此操作無法復原！")) return;
+            const collRef = collection(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings');
+            const snapshot = await getDocs(collRef);
+            const batchSize = 500;
+            let batch = writeBatch(db);
+            let count = 0;
+            for (const doc of snapshot.docs) {
+                batch.delete(doc.ref);
+                count++;
+                if (count >= batchSize) { await batch.commit(); batch = writeBatch(db); count = 0; }
             }
-        }
+            if (count > 0) await batch.commit();
+            alert("已清空資料庫");
+            toggleSettings();
+        };
 
         initApp();
     </script>
-
     <style>
         body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3b82f6;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-        }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .modal { transition: opacity 0.25s ease; }
-        
-        /* 增加底部緩衝空間，讓鍵盤彈出時有位置滾動 */
+        /* 避免鍵盤遮擋 */
         .pb-keypad { padding-bottom: 300px; }
-        
         ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
@@ -249,897 +156,527 @@
     <!-- Header -->
     <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-50">
         <div class="flex justify-between items-center max-w-md mx-auto">
-            <h1 class="text-xl font-bold"><i class="fa-solid fa-cubes mr-2"></i>樂高抽屜管家</h1>
-            <div class="flex items-center space-x-2">
-                <div id="cloud-status" class="text-xs bg-white px-2 py-1 rounded shadow text-gray-500 font-bold">
-                    <i class="fa-solid fa-circle-notch fa-spin"></i> 連線中...
-                </div>
-                <button onclick="toggleSettings()" class="text-white hover:text-blue-200">
-                    <i class="fa-solid fa-gear text-xl"></i>
-                </button>
+            <h1 class="text-xl font-bold"><i class="fa-solid fa-cubes mr-2"></i>樂高管家</h1>
+            <div class="flex items-center space-x-3">
+                <div id="cloud-status" class="text-xs font-bold opacity-80">...</div>
+                <button onclick="toggleSettings()" class="hover:text-blue-200"><i class="fa-solid fa-gear text-xl"></i></button>
             </div>
         </div>
     </header>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl max-h-[90vh] overflow-y-auto">
-            <h3 class="text-lg font-bold mb-4 flex items-center">
-                <i class="fa-solid fa-robot mr-2 text-blue-600"></i> 設定
-            </h3>
-            
-            <div class="mb-6">
-                <p class="text-sm text-gray-600 mb-2 font-bold">AI 辨識設定</p>
-                <div class="mb-4">
-                    <label class="block text-xs text-gray-500 mb-1">Google Gemini API Key</label>
-                    <input type="password" id="gemini-api-key" class="w-full border rounded p-2 text-sm" placeholder="貼上您的 API Key">
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-xs text-blue-500 underline mt-1 block">取得免費 API Key</a>
-                    <p class="text-[10px] text-green-600 mt-1 hidden" id="key-saved-msg"><i class="fa-solid fa-check"></i> 已儲存</p>
-                </div>
-
-                <div class="mb-2">
-                    <label class="block text-xs text-gray-500 mb-1">AI 模型選擇</label>
-                    <select id="gemini-model-select" class="w-full border rounded p-2 text-sm bg-gray-50 text-gray-800">
-                        <optgroup label="穩定版本 (推薦)">
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash (免費額度最高/最穩)</option>
-                            <option value="gemini-1.5-pro">Gemini 1.5 Pro (高智商)</option>
-                        </optgroup>
-                        <optgroup label="實驗版本 (不穩)">
-                            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</option>
-                        </optgroup>
-                    </select>
+    <!-- Main Content -->
+    <main id="main-content" class="flex-grow p-4 max-w-md mx-auto w-full pb-24 transition-all">
+        
+        <!-- 1. 搜尋/辨識區 -->
+        <div class="bg-white p-6 rounded-xl shadow-lg text-center mb-6">
+            <div class="mb-4 relative group cursor-pointer" onclick="document.getElementById('camera-input').click()">
+                <div id="preview-container" class="w-full h-48 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative">
+                    <div class="text-gray-400 flex flex-col items-center">
+                        <i class="fa-solid fa-camera text-4xl mb-2"></i>
+                        <span class="text-sm">拍照辨識</span>
+                    </div>
+                    <img id="preview-img" class="absolute inset-0 w-full h-full object-contain hidden" />
                 </div>
             </div>
+            <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleImage(this)">
 
-            <!-- Danger Zone -->
-            <div class="mb-6 pt-4 border-t border-gray-200">
-                <p class="text-sm text-red-600 font-bold mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 危險區域</p>
-                <button id="clear-all-btn" onclick="clearAllCloudData()" class="w-full bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 font-bold py-2 px-4 rounded transition text-sm">
-                    <i class="fa-solid fa-trash-can mr-2"></i> 清空所有抽屜資料
-                </button>
-                <p class="text-[10px] text-gray-400 mt-1">此操作會刪除雲端資料庫中所有的零件與抽屜對應關係。</p>
+            <!-- Loading -->
+            <div id="loading" class="hidden flex flex-col items-center justify-center py-4">
+                <div class="loader mb-2"></div>
+                <span id="loading-text" class="text-xs text-gray-500">正在辨識...</span>
             </div>
 
-            <div class="flex justify-end space-x-2 border-t pt-4">
-                <button onclick="toggleSettings()" class="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded">取消</button>
-                <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">儲存設定</button>
+            <!-- Manual Input -->
+            <div class="flex items-center border-b-2 border-gray-200 focus-within:border-blue-500 py-1 px-2">
+                <i class="fa-solid fa-magnifying-glass text-gray-400 mr-2"></i>
+                <input type="text" id="part-id-input" class="flex-1 bg-transparent outline-none font-mono font-bold text-lg text-gray-700" placeholder="或輸入零件 ID" onchange="manualSearch()">
+                <button id="retry-btn" onclick="retryWithGemini()" class="hidden text-xs bg-red-100 text-red-600 px-2 py-1 rounded ml-2 font-bold">重試</button>
             </div>
         </div>
-    </div>
+
+        <!-- 2. 結果顯示與操作區 (動態切換) -->
+        <div id="result-area" class="hidden space-y-4">
+            
+            <!-- 零件資訊卡 -->
+            <div class="bg-white p-4 rounded-xl shadow-lg border-l-4 border-gray-300" id="info-card">
+                <div class="flex items-start">
+                    <img id="api-img" src="" class="w-16 h-16 object-contain bg-gray-50 rounded border border-gray-200 mr-3 hidden">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-bold font-mono text-gray-800" id="res-part-id">---</h2>
+                            <span id="res-source" class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Source</span>
+                        </div>
+                        <p class="text-sm text-gray-500 truncate" id="res-part-name">---</p>
+                    </div>
+                </div>
+
+                <!-- 狀態 A: 已存在 (顯示位置 + 操作) -->
+                <div id="status-exist" class="hidden mt-4 pt-4 border-t border-gray-100">
+                    <p class="text-sm text-gray-500 mb-2">目前位置：</p>
+                    <div id="drawer-list" class="flex flex-wrap gap-2 mb-4">
+                        <!-- Drawer Tags injected here -->
+                    </div>
+                    
+                    <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <div class="text-xs font-bold text-gray-500 mb-2">管理操作：</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="showActionPanel('add')" class="bg-white border border-blue-200 text-blue-600 py-2 rounded shadow-sm font-bold text-sm hover:bg-blue-50">
+                                <i class="fa-solid fa-plus mr-1"></i> 新增位置
+                            </button>
+                            <button onclick="showActionPanel('move')" class="bg-white border border-red-200 text-red-600 py-2 rounded shadow-sm font-bold text-sm hover:bg-red-50">
+                                <i class="fa-solid fa-arrow-right-arrow-left mr-1"></i> 移動位置
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 狀態 B: 未登錄 (直接顯示入庫) -->
+                <div id="status-new" class="hidden mt-4 pt-4 border-t border-gray-100">
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                        <p class="text-blue-800 font-bold mb-2 flex items-center">
+                            <i class="fa-solid fa-circle-exclamation mr-2"></i> 尚未登錄，立即入庫？
+                        </p>
+                        <!-- 嵌入操作面板 (預設為 Add 模式) -->
+                        <div id="inline-action-panel"></div> 
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作面板 (輸入抽屜號) -->
+            <!-- 透過 JS 移動到 status-exist 或 status-new 內 -->
+            <div id="action-panel-template" class="hidden">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-sm text-gray-600 font-bold" id="action-label">抽屜號碼：</span>
+                    <input type="text" id="drawer-input" class="w-20 p-2 border-2 border-blue-500 rounded text-center text-xl font-bold bg-white cursor-pointer" readonly onclick="openKeypad('drawer-input')">
+                    
+                    <label class="flex items-center space-x-1 cursor-pointer bg-white px-2 py-2 rounded border">
+                        <input type="checkbox" id="drawer-sub" class="w-4 h-4 accent-blue-600">
+                        <span class="text-sm font-bold">a</span>
+                    </label>
+                </div>
+                
+                <!-- 抽屜調整按鈕 -->
+                <div class="flex gap-2 mb-3">
+                    <button onclick="adjustDrawer(-1)" class="flex-1 bg-gray-200 rounded py-1 text-gray-600 font-bold hover:bg-gray-300">-</button>
+                    <button onclick="adjustDrawer(1)" class="flex-1 bg-gray-200 rounded py-1 text-gray-600 font-bold hover:bg-gray-300">+</button>
+                </div>
+
+                <button id="confirm-btn" class="w-full py-3 rounded-lg font-bold text-white shadow transition-transform active:scale-95 flex justify-center items-center">
+                    <span>確認</span>
+                </button>
+            </div>
+
+        </div>
+    </main>
 
     <!-- Keypad Modal -->
     <div id="keypad-modal" class="fixed inset-0 z-[70] hidden flex items-end justify-center pointer-events-none">
         <div class="bg-white w-full max-w-md shadow-[0_-4px_20px_rgba(0,0,0,0.15)] rounded-t-2xl p-4 pointer-events-auto transform transition-transform duration-300 translate-y-full" id="keypad-content">
             <div class="flex justify-between items-center mb-3">
-                <span class="text-gray-500 font-bold text-sm">輸入抽屜號碼</span>
-                <button onclick="closeKeypad()" class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200">
-                    <i class="fa-solid fa-chevron-down"></i>
-                </button>
+                <span class="text-gray-500 font-bold text-sm">輸入號碼</span>
+                <button onclick="closeKeypad()" class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full"><i class="fa-solid fa-chevron-down"></i></button>
             </div>
-            
             <div class="grid grid-cols-4 gap-2">
-                <button onclick="appendKeypad('1')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">1</button>
-                <button onclick="appendKeypad('2')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">2</button>
-                <button onclick="appendKeypad('3')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">3</button>
-                <button onclick="backspaceKeypad()" class="bg-red-50 border border-red-100 rounded-lg p-3 text-red-500 active:bg-red-100"><i class="fa-solid fa-delete-left"></i></button>
-
-                <button onclick="appendKeypad('4')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">4</button>
-                <button onclick="appendKeypad('5')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">5</button>
-                <button onclick="appendKeypad('6')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">6</button>
-                <button onclick="confirmKeypad()" class="bg-blue-600 rounded-lg p-3 text-white font-bold row-span-3 flex items-center justify-center shadow-md active:bg-blue-700">OK</button>
-
-                <button onclick="appendKeypad('7')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">7</button>
-                <button onclick="appendKeypad('8')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">8</button>
-                <button onclick="appendKeypad('9')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold active:bg-blue-50">9</button>
-                
-                <button onclick="clearKeypad()" class="bg-gray-200 border border-gray-300 rounded-lg p-3 text-gray-600 font-bold text-xs active:bg-gray-300">CLR</button>
-                <button onclick="appendKeypad('0')" class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xl font-bold col-span-2 active:bg-blue-50">0</button>
+                <button onclick="k('1')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">1</button>
+                <button onclick="k('2')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">2</button>
+                <button onclick="k('3')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">3</button>
+                <button onclick="k('del')" class="bg-red-50 border border-red-100 rounded p-3 text-red-500 active:bg-red-100"><i class="fa-solid fa-delete-left"></i></button>
+                <button onclick="k('4')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">4</button>
+                <button onclick="k('5')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">5</button>
+                <button onclick="k('6')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">6</button>
+                <button onclick="k('ok')" class="bg-blue-600 rounded p-3 text-white font-bold row-span-3 flex items-center justify-center shadow active:bg-blue-700">OK</button>
+                <button onclick="k('7')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">7</button>
+                <button onclick="k('8')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">8</button>
+                <button onclick="k('9')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold active:bg-blue-50">9</button>
+                <button onclick="k('clr')" class="bg-gray-200 border border-gray-300 rounded p-3 text-xs font-bold active:bg-gray-300">CLR</button>
+                <button onclick="k('0')" class="bg-gray-50 border border-gray-200 rounded p-3 text-xl font-bold col-span-2 active:bg-blue-50">0</button>
             </div>
         </div>
     </div>
 
-    <!-- Mode Tabs -->
-    <div class="bg-white shadow-sm sticky top-16 z-40">
-        <div class="flex max-w-md mx-auto">
-            <button id="tab-find" onclick="switchMode('find')" class="flex-1 py-3 text-center border-b-2 border-blue-600 font-bold text-blue-600 bg-blue-50 transition-colors">
-                <i class="fa-solid fa-search mr-1"></i> 1. 找抽屜
-            </button>
-            <button id="tab-encode" onclick="switchMode('encode')" class="flex-1 py-3 text-center border-b-2 border-transparent text-gray-500 hover:text-blue-500 transition-colors">
-                <i class="fa-solid fa-pen-to-square mr-1"></i> 2. 抽屜編碼
-            </button>
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 z-[80] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg p-6 w-full max-w-sm">
+            <h3 class="font-bold mb-4">設定</h3>
+            <div class="mb-4">
+                <label class="block text-xs text-gray-500">Gemini API Key</label>
+                <input type="password" id="gemini-key" class="w-full border rounded p-2">
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs text-gray-500">Model</label>
+                <select id="gemini-model" class="w-full border rounded p-2">
+                    <option value="gemini-1.5-flash">1.5 Flash (推薦)</option>
+                    <option value="gemini-1.5-pro">1.5 Pro</option>
+                    <option value="gemini-2.0-flash-exp">2.0 Flash Exp</option>
+                </select>
+            </div>
+            <button onclick="window.clearAllCloudData()" class="w-full text-red-500 border border-red-200 p-2 rounded mb-4 text-xs font-bold">清空所有資料</button>
+            <div class="flex justify-end gap-2">
+                <button onclick="toggleSettings()" class="px-4 py-2 text-gray-500">取消</button>
+                <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 text-white rounded">儲存</button>
+            </div>
         </div>
     </div>
-
-    <!-- Main Content -->
-    <main id="main-content" class="flex-grow p-4 max-w-md mx-auto w-full pb-24 transition-all">
-
-        <div id="message-box" class="hidden mb-4 p-3 rounded text-center text-sm font-semibold whitespace-pre-line"></div>
-
-        <!-- MODE 1: FIND DRAWER -->
-        <div id="mode-find" class="block space-y-6">
-            <div class="bg-white p-6 rounded-xl shadow-lg text-center">
-                <h2 class="text-lg font-bold mb-4 text-gray-700">尋找零件歸屬</h2>
-                
-                <div class="mb-6 relative group cursor-pointer" onclick="document.getElementById('find-camera').click()">
-                    <div id="find-preview-container" class="w-full h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative">
-                        <i class="fa-solid fa-camera text-4xl text-gray-400"></i>
-                        <img id="find-preview" class="absolute inset-0 w-full h-full object-contain hidden" />
-                    </div>
-                    <p class="mt-2 text-sm text-gray-500">點擊拍照或上傳圖片</p>
-                </div>
-
-                <input type="file" id="find-camera" accept="image/*" capture="environment" class="hidden" onchange="handleImage(this, 'find')">
-
-                <div id="find-loading" class="hidden flex flex-col items-center justify-center py-4">
-                    <div class="loader mb-2"></div>
-                    <span id="loading-text" class="text-xs text-gray-500">正在壓縮並上傳辨識...</span>
-                </div>
-                
-                <div id="find-result" class="hidden mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div class="flex items-center justify-center mb-2 space-x-3">
-                        <img id="find-api-img" src="" class="w-12 h-12 object-contain hidden bg-white rounded border border-gray-200" alt="Part Image">
-                        <div class="text-left">
-                            <p class="text-gray-500 text-sm mb-0">辨識結果 <span id="find-source-tag" class="text-[10px] px-1 rounded bg-gray-200 text-gray-600">來源</span></p>
-                            <div class="flex items-center border-b-2 border-blue-200 focus-within:border-blue-500">
-                                <input type="text" id="find-part-id-input" class="text-xl font-mono font-bold text-gray-800 w-32 bg-transparent outline-none" value="---" onchange="manualUpdateId('find')">
-                                <i class="fa-solid fa-pen text-gray-400 text-xs ml-1"></i>
-                            </div>
-                            <button id="find-retry-gemini" onclick="retryWithGemini()" class="hidden text-[10px] text-red-500 underline cursor-pointer hover:text-red-700 mt-1 block">結果不對？用 Gemini 重試</button>
-                        </div>
-                    </div>
-                    
-                    <button onclick="refreshFindResult()" id="find-refresh-btn" class="hidden w-full mb-3 py-1 bg-blue-100 text-blue-700 rounded text-sm font-bold"><i class="fa-solid fa-rotate-right mr-1"></i> 以新編號搜尋</button>
-
-                    <div class="my-3 border-t border-gray-200"></div>
-                    <p class="text-gray-500 text-sm mb-1">存放位置</p>
-                    <p id="find-drawer-id" class="text-2xl font-bold text-blue-600 break-words">---</p>
-
-                    <div id="find-quick-assign" class="hidden mt-4 pt-4 border-t border-gray-300 bg-yellow-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-lg">
-                        <p class="text-sm text-yellow-800 font-bold mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 未找到！立即指定位置：</p>
-                        <div class="flex items-center space-x-2 mb-3 justify-center bg-white p-2 rounded border border-gray-200 shadow-sm">
-                            <span class="text-sm text-gray-600">抽屜</span>
-                            <input type="text" id="find-drawer-input" class="w-20 p-1 border rounded text-center font-bold text-lg cursor-pointer bg-white" min="1" value="1" readonly onclick="openKeypad('find-drawer-input')">
-                            
-                            <label class="flex items-center space-x-1 cursor-pointer bg-gray-50 px-2 py-1 rounded border">
-                                <input type="checkbox" id="find-drawer-sub" class="w-4 h-4 accent-blue-600">
-                                <span class="text-sm font-bold">夾層 a</span>
-                            </label>
-                        </div>
-                        <button onclick="saveFromFindMode()" class="w-full bg-yellow-500 text-white py-2 rounded-lg font-bold shadow hover:bg-yellow-600 active:scale-95 transition-transform flex justify-center items-center">
-                            <i class="fa-solid fa-plus-circle mr-2"></i> 儲存對應關係
-                        </button>
-                    </div>
-
-                    <div id="find-add-more" class="hidden mt-4 pt-4 border-t border-gray-200">
-                         <button onclick="toggleQuickAdd()" class="text-xs text-blue-600 underline">同時放在其他抽屜？</button>
-                         <div id="quick-add-panel" class="hidden mt-2 bg-blue-50 p-3 rounded">
-                            <div class="flex items-center space-x-2 mb-2 justify-center">
-                                <span class="text-sm text-gray-600">新增抽屜</span>
-                                <input type="text" id="add-drawer-input" class="w-16 p-1 border rounded text-center cursor-pointer bg-white" min="1" value="1" readonly onclick="openKeypad('add-drawer-input')">
-                                
-                                <label class="flex items-center space-x-1">
-                                    <input type="checkbox" id="add-drawer-sub" class="w-4 h-4 accent-blue-600">
-                                    <span class="text-xs">a</span>
-                                </label>
-                            </div>
-                            <button onclick="saveFromFindMode(true)" class="w-full bg-blue-500 text-white py-1 rounded text-sm font-bold">新增位置</button>
-                         </div>
-                    </div>
-
-                    <!-- MOVE UI (Find Mode) -->
-                    <div id="find-move-panel-container" class="hidden mt-2 border-t pt-2 border-gray-100">
-                        <button onclick="toggleQuickMove()" class="text-xs text-red-500 underline w-full text-center">移動到其他抽屜？</button>
-                        <div id="quick-move-panel" class="hidden mt-2 bg-red-50 p-3 rounded">
-                            <p class="text-xs text-red-700 font-bold mb-2">將此零件移動至 (舊位置將被移除)：</p>
-                            <div class="flex items-center space-x-2 mb-3 justify-center">
-                                <span class="text-sm text-gray-600">新抽屜</span>
-                                <input type="text" id="move-drawer-input" class="w-16 p-1 border border-red-300 rounded text-center cursor-pointer bg-white" min="1" value="1" readonly onclick="openKeypad('move-drawer-input')">
-                                <label class="flex items-center space-x-1">
-                                    <input type="checkbox" id="move-drawer-sub" class="w-4 h-4 accent-red-600">
-                                    <span class="text-xs">a</span>
-                                </label>
-                            </div>
-                            <button onclick="moveFromFindMode()" class="w-full bg-red-500 text-white py-1 rounded text-sm font-bold shadow hover:bg-red-600">確認移動</button>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-            
-            <div class="bg-blue-50 p-4 rounded-lg text-sm text-blue-800 border border-blue-100">
-                <i class="fa-solid fa-circle-info mr-1"></i> 
-                優先使用 Brickognize 辨識。
-            </div>
-        </div>
-
-        <!-- MODE 2: ENCODE DRAWER -->
-        <div id="mode-encode" class="hidden space-y-6">
-            
-            <!-- Drawer Navigation -->
-            <div class="bg-white p-4 rounded-xl shadow-lg">
-                <div class="flex justify-between items-center mb-2">
-                    <h2 class="text-lg font-bold text-gray-700">當前設定抽屜</h2>
-                    <button onclick="findNextEmptyDrawer()" class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded border border-green-200 hover:bg-green-200">
-                        <i class="fa-solid fa-forward mr-1"></i>跳至未編碼
-                    </button>
-                </div>
-
-                <div class="flex items-center space-x-2">
-                    <button onclick="adjustDrawer(-1)" class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 text-gray-600">
-                        <i class="fa-solid fa-minus"></i>
-                    </button>
-                    
-                    <div class="flex-1 flex space-x-2">
-                        <input type="text" id="drawer-num" value="1" class="w-full text-center text-2xl font-bold border-2 border-gray-300 rounded focus:border-blue-500 outline-none p-2 cursor-pointer bg-white" readonly onclick="openKeypad('drawer-num')">
-                        
-                        <label class="flex flex-col items-center justify-center p-2 border-2 border-gray-300 rounded cursor-pointer select-none bg-gray-50" id="sub-drawer-label">
-                            <span class="text-xs text-gray-500 font-bold">夾層 a</span>
-                            <input type="checkbox" id="drawer-sub" class="w-5 h-5 mt-1 accent-blue-600" onchange="updateDrawerString()">
-                        </label>
-                    </div>
-
-                    <button onclick="adjustDrawer(1)" class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 text-gray-600">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
-                </div>
-                
-                <div class="text-center mt-2 text-gray-500 font-mono text-sm">
-                    目前標記為: <span id="current-drawer-display" class="font-bold text-blue-600 text-lg">1</span>
-                    <span id="drawer-status" class="ml-2 text-xs text-gray-400">(讀取中...)</span>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-xl shadow-lg text-center">
-                <div class="mb-4 relative group cursor-pointer" onclick="document.getElementById('encode-camera').click()">
-                    <div id="encode-preview-container" class="w-full h-40 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative">
-                        <i class="fa-solid fa-camera text-3xl text-gray-400"></i>
-                        <img id="encode-preview" class="absolute inset-0 w-full h-full object-contain hidden" />
-                    </div>
-                    <p class="mt-2 text-sm text-gray-500">拍照識別零件 ID</p>
-                </div>
-                <input type="file" id="encode-camera" accept="image/*" capture="environment" class="hidden" onchange="handleImage(this, 'encode')">
-
-                <div id="encode-loading" class="hidden flex flex-col items-center justify-center py-4">
-                    <div class="loader mb-2"></div>
-                    <span id="encode-loading-text" class="text-xs text-gray-500">正在壓縮並上傳辨識...</span>
-                </div>
-
-                <div id="encode-actions" class="hidden mt-4">
-                    <div class="bg-gray-50 p-2 rounded border border-gray-200 mb-4">
-                        <div class="flex justify-center mb-2">
-                             <img id="encode-api-img" src="" class="w-16 h-16 object-contain hidden bg-white rounded border border-gray-200">
-                        </div>
-                        <span class="text-xs text-gray-500">辨識結果 <span id="encode-source-tag" class="text-[10px] px-1 rounded bg-gray-200 text-gray-600">來源</span></span>
-                        
-                        <button id="encode-retry-gemini" onclick="retryWithGemini()" class="hidden text-[10px] text-red-500 underline cursor-pointer hover:text-red-700 w-full text-center mb-1">結果不對？用 Gemini 重試</button>
-
-                        <div class="flex justify-center mt-1">
-                             <div class="flex items-center border-b-2 border-blue-200 focus-within:border-blue-500">
-                                <input type="text" id="encode-part-id-input" class="text-xl font-mono font-bold text-gray-800 w-32 bg-transparent outline-none text-center" value="---" onchange="manualUpdateId('encode')">
-                                <i class="fa-solid fa-pen text-gray-400 text-xs ml-1"></i>
-                            </div>
-                        </div>
-                        <div id="encode-part-name" class="text-xs text-gray-500 truncate mt-1"></div>
-                        
-                        <div id="encode-duplicate-warning" class="hidden mt-2 bg-blue-100 border border-blue-300 text-blue-800 p-2 rounded text-xs font-bold flex items-center justify-center">
-                            <i class="fa-solid fa-circle-info mr-2"></i>
-                            <span id="encode-duplicate-text"></span>
-                        </div>
-                    </div>
-                    <button onclick="saveMapping()" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow hover:bg-blue-700 active:transform active:scale-95 transition-all flex justify-center items-center">
-                        <i class="fa-solid fa-plus mr-2"></i> 加入此抽屜
-                    </button>
-                    <!-- MOVE BUTTON for Encode Mode -->
-                    <button onclick="moveMapping()" class="w-full mt-2 bg-red-100 text-red-600 font-bold py-2 px-4 rounded-lg shadow hover:bg-red-200 active:transform active:scale-95 transition-all flex justify-center items-center text-sm border border-red-200">
-                        <i class="fa-solid fa-arrow-right-arrow-left mr-2"></i> 移動至此 (移除舊位置)
-                    </button>
-                </div>
-            </div>
-
-            <div class="bg-white p-4 rounded-xl shadow-lg">
-                <h3 class="font-bold text-gray-700 mb-2 text-sm">此抽屜已存放 (雲端資料):</h3>
-                <ul id="drawer-contents" class="text-sm text-gray-600 space-y-2 max-h-64 overflow-y-auto pr-1">
-                    <li class="italic text-gray-400">讀取中...</li>
-                </ul>
-            </div>
-        </div>
-
-    </main>
 
     <script>
-        let currentMode = 'find';
+        // State
         let currentPartId = null;
         let currentPartName = "";
-        let currentPartImgUrl = ""; 
-        let currentResizedBlob = null; 
-        let currentKeypadTarget = null; // Keypad Target
+        let currentPartImgUrl = "";
+        let currentResizedBlob = null;
+        let currentKeypadTarget = null;
+        let currentAction = 'append'; // 'append' or 'move'
         
         let geminiApiKey = localStorage.getItem('lego_gemini_key') || "";
         let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-1.5-flash";
 
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js');
-            });
-        }
-
-        // --- Keypad Functions ---
-        function openKeypad(targetId) {
-            currentKeypadTarget = document.getElementById(targetId);
-            if(currentKeypadTarget) {
-                // Add padding to main content to ensure scroll space
-                document.getElementById('main-content').classList.add('pb-80'); // Add space at bottom
-
-                const modal = document.getElementById('keypad-modal');
-                const content = document.getElementById('keypad-content');
-                modal.classList.remove('hidden');
-                
-                requestAnimationFrame(() => {
-                    content.classList.remove('translate-y-full');
-                    // Scroll input into view smoothly
-                    setTimeout(() => {
-                        currentKeypadTarget.scrollIntoView({behavior: 'smooth', block: 'center'});
-                    }, 300);
-                });
-            }
-        }
-
-        function closeKeypad() {
-            const modal = document.getElementById('keypad-modal');
-            const content = document.getElementById('keypad-content');
-            content.classList.add('translate-y-full');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                document.getElementById('main-content').classList.remove('pb-80'); // Remove padding
-                currentKeypadTarget = null;
-            }, 300);
-        }
-
-        function appendKeypad(num) {
-            if (currentKeypadTarget) {
-                if (currentKeypadTarget.value === "0") currentKeypadTarget.value = "";
-                currentKeypadTarget.value += num;
-            }
-        }
-
-        function clearKeypad() {
-            if (currentKeypadTarget) currentKeypadTarget.value = "";
-        }
-
-        function backspaceKeypad() {
-            if (currentKeypadTarget) {
-                currentKeypadTarget.value = currentKeypadTarget.value.slice(0, -1);
-            }
-        }
-
-        function confirmKeypad() {
-            if (currentKeypadTarget) {
-                if (currentKeypadTarget.value === "") currentKeypadTarget.value = "1";
-                if (currentKeypadTarget.id === 'drawer-num') updateDrawerString();
-            }
-            closeKeypad();
-        }
-
-        // ... existing settings functions ...
-        function toggleSettings() {
-            document.getElementById('settings-modal').classList.toggle('hidden');
-            if (!document.getElementById('settings-modal').classList.contains('hidden')) {
-                document.getElementById('gemini-api-key').value = geminiApiKey;
-                document.getElementById('gemini-model-select').value = geminiModel;
-                if(geminiApiKey) document.getElementById('key-saved-msg').classList.remove('hidden');
-                else document.getElementById('key-saved-msg').classList.add('hidden');
-            }
-        }
-        
-        function saveSettings() {
-            const key = document.getElementById('gemini-api-key').value.trim();
-            const model = document.getElementById('gemini-model-select').value;
-            geminiApiKey = key;
-            geminiModel = model;
-            localStorage.setItem('lego_gemini_key', key);
-            localStorage.setItem('lego_gemini_model', model);
-            toggleSettings();
-            showMessage("設定已儲存", "success");
-        }
-        
-        window.addEventListener('mappingsUpdated', () => { updateDrawerStatus(); });
-        document.addEventListener('DOMContentLoaded', () => { updateDrawerStatus(); });
-
-        function showMessage(msg, type = 'success') {
-            const box = document.getElementById('message-box');
-            box.textContent = msg;
-            box.className = `mb-4 p-3 rounded text-center text-sm font-semibold whitespace-pre-line ${type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
-            box.classList.remove('hidden');
-            setTimeout(() => box.classList.add('hidden'), 5000);
-        }
-
-        function switchMode(mode) {
-            currentMode = mode;
-            document.getElementById('mode-find').classList.toggle('hidden', mode !== 'find');
-            document.getElementById('mode-encode').classList.toggle('hidden', mode !== 'encode');
-            
-            const tabFind = document.getElementById('tab-find');
-            const tabEncode = document.getElementById('tab-encode');
-            
-            if (mode === 'find') {
-                tabFind.className = "flex-1 py-3 text-center border-b-2 border-blue-600 font-bold text-blue-600 bg-blue-50 transition-colors";
-                tabEncode.className = "flex-1 py-3 text-center border-b-2 border-transparent text-gray-500 hover:text-blue-500 transition-colors";
-            } else {
-                tabEncode.className = "flex-1 py-3 text-center border-b-2 border-blue-600 font-bold text-blue-600 bg-blue-50 transition-colors";
-                tabFind.className = "flex-1 py-3 text-center border-b-2 border-transparent text-gray-500 hover:text-blue-500 transition-colors";
-                if (Object.keys(window.mappings).length > 0) findNextEmptyDrawer(false); 
-            }
-        }
-
-        function getDrawerString() {
-            const num = document.getElementById('drawer-num').value;
-            const isSub = document.getElementById('drawer-sub').checked;
-            return isSub ? `${num}a` : `${num}`;
-        }
-
-        function updateDrawerString() {
-            const drawerId = getDrawerString();
-            document.getElementById('current-drawer-display').textContent = drawerId;
-            updateDrawerStatus();
-        }
-
-        function adjustDrawer(delta) {
-            const input = document.getElementById('drawer-num');
-            let val = parseInt(input.value) + delta;
-            if (val < 1) val = 1;
-            if (val > 9999) val = 9999; 
-            input.value = val;
-            updateDrawerString();
-        }
-
-        function updateDrawerStatus() {
-            const drawerId = getDrawerString();
-            const contentsList = document.getElementById('drawer-contents');
-            const statusSpan = document.getElementById('drawer-status');
-            
-            contentsList.innerHTML = '';
-            
-            const parts = Object.entries(window.mappings || {}).filter(([pid, data]) => {
-                return data && Array.isArray(data.drawers) && data.drawers.includes(drawerId);
-            });
-            
-            if (parts.length > 0) {
-                statusSpan.textContent = `(已有 ${parts.length} 種零件)`;
-                statusSpan.className = "ml-2 text-xs text-orange-500 font-bold";
-                
-                parts.forEach(([pid, data]) => {
-                    const li = document.createElement('li');
-                    li.className = "flex items-center justify-between bg-white border border-gray-200 rounded p-2 shadow-sm";
-                    
-                    let imgHtml = '';
-                    if (data.img && data.img.startsWith('http')) {
-                        imgHtml = `<img src="${data.img}" class="w-8 h-8 object-contain bg-gray-50 rounded border border-gray-100 mr-2">`;
-                    } else {
-                        imgHtml = `<div class="w-8 h-8 bg-gray-100 rounded border border-gray-100 mr-2 flex items-center justify-center text-gray-300"><i class="fa-solid fa-cube"></i></div>`;
-                    }
-
-                    li.innerHTML = `
-                        <div class="flex items-center">
-                            ${imgHtml}
-                            <span class="font-mono font-bold text-gray-700 truncate w-32 text-xs" title="${pid}">${pid}</span>
-                        </div>
-                        <button onclick="removeMapping('${pid}', '${drawerId}')" class="text-red-400 hover:text-red-600 p-2"><i class="fa-solid fa-trash"></i></button>
-                    `;
-                    contentsList.appendChild(li);
-                });
-            } else {
-                statusSpan.textContent = "(空)";
-                statusSpan.className = "ml-2 text-xs text-green-500 font-bold";
-                contentsList.innerHTML = '<li class="italic text-gray-400">尚無零件</li>';
-            }
-        }
-
+        // --- Logic ---
         function getNextEmptyDrawerId() {
-            const usedDrawers = new Set();
-            Object.values(window.mappings || {}).forEach(data => {
-                if(data && Array.isArray(data.drawers)) data.drawers.forEach(d => usedDrawers.add(d));
+            const used = new Set();
+            Object.values(window.mappings || {}).forEach(d => {
+                if(d.drawers) d.drawers.forEach(dr => used.add(dr.toString().replace('a','')));
             });
-            for (let i = 1; i <= 9999; i++) { 
-                if (!usedDrawers.has(`${i}`)) return i;
-            }
+            for(let i=1; i<=9999; i++) if(!used.has(i.toString())) return i;
             return 1;
         }
 
-        function findNextEmptyDrawer(doMove = true) {
-            const nextId = getNextEmptyDrawerId();
-            if (doMove) moveToDrawer(nextId, false);
-        }
-
-        function moveToDrawer(num, isSub) {
-            document.getElementById('drawer-num').value = num;
-            document.getElementById('drawer-sub').checked = isSub;
-            updateDrawerString();
-        }
-
-        function checkExistingLocation(partId) {
-            const warningBox = document.getElementById('encode-duplicate-warning');
-            const warningText = document.getElementById('encode-duplicate-text');
+        function checkAndDisplayDrawer(partId) {
+            currentPartId = partId;
             const partData = (window.mappings || {})[partId];
             const drawers = partData ? partData.drawers : [];
+            
+            // Render Info
+            document.getElementById('res-part-id').textContent = partId;
+            document.getElementById('res-part-name').textContent = currentPartName || partData?.name || "---";
+            
+            // Image
+            const img = document.getElementById('api-img');
+            const url = currentPartImgUrl || partData?.img;
+            if(url) { img.src = url; img.classList.remove('hidden'); }
+            else { img.classList.add('hidden'); }
 
-            if (drawers.length > 0) {
-                warningText.textContent = `此零件已存在於：抽屜 ${drawers.join(', ')}`;
-                warningBox.classList.remove('hidden');
+            document.getElementById('result-area').classList.remove('hidden');
+
+            if(drawers.length > 0) {
+                // 情境 A: 已存在
+                document.getElementById('status-exist').classList.remove('hidden');
+                document.getElementById('status-new').classList.add('hidden');
+                document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-4 border-green-500"; // Green border
+                
+                // Render Tags
+                const list = document.getElementById('drawer-list');
+                list.innerHTML = drawers.map(d => 
+                    `<div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-bold shadow-sm flex items-center">
+                        <i class="fa-solid fa-box-open mr-2 text-xs"></i>${d}
+                        <button onclick="removeLoc('${d}')" class="ml-2 text-blue-400 hover:text-red-500"><i class="fa-solid fa-xmark"></i></button>
+                     </div>`
+                ).join('');
+
+                // Clear inline panel if it was here
+                document.getElementById('inline-action-panel').innerHTML = '';
             } else {
-                warningBox.classList.add('hidden');
+                // 情境 B: 新零件
+                document.getElementById('status-exist').classList.add('hidden');
+                document.getElementById('status-new').classList.remove('hidden');
+                document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-4 border-yellow-400"; // Yellow border
+
+                // 自動將操作面板移入 status-new，並設為 'add' 模式
+                setupActionPanel('add', document.getElementById('inline-action-panel'));
+                
+                // 預設填入下一個空位
+                document.getElementById('drawer-input').value = getNextEmptyDrawerId();
             }
         }
 
-        // --- Move Logic Functions ---
-        function toggleQuickMove() {
-            const panel = document.getElementById('quick-move-panel');
-            panel.classList.toggle('hidden');
-        }
-
-        function toggleQuickAdd() {
-            const panel = document.getElementById('quick-add-panel');
-            panel.classList.toggle('hidden');
-        }
-
-        // Move From Find Mode (UI Logic)
-        async function moveFromFindMode() {
-            if (!currentPartId) return;
-            const num = document.getElementById('move-drawer-input').value;
-            const isSub = document.getElementById('move-drawer-sub').checked;
-            const drawerId = isSub ? `${num}a` : `${num}`;
+        // --- Action Panel Logic ---
+        window.showActionPanel = (action) => {
+            // 點擊新增或移動時，我們在 status-exist 下方動態插入面板
+            const container = document.getElementById('status-exist');
+            let panelContainer = document.getElementById('dynamic-action-area');
             
-            if (confirm(`確定要將零件 ${currentPartId} 移動到抽屜 ${drawerId} 嗎？\n(這將移除它在其他抽屜的所有紀錄)`)) {
-                if (window.moveMappingCloud) {
-                    await window.moveMappingCloud(currentPartId, drawerId, currentPartName, currentPartImgUrl);
-                    showMessage(`已移動: ${currentPartId} -> 抽屜 ${drawerId}`);
-                    document.getElementById('quick-move-panel').classList.add('hidden');
-                    // Refresh find result to show new location
-                    checkAndDisplayDrawer(currentPartId);
-                }
+            if(!panelContainer) {
+                panelContainer = document.createElement('div');
+                panelContainer.id = 'dynamic-action-area';
+                panelContainer.className = "mt-4 pt-4 border-t border-gray-100";
+                container.appendChild(panelContainer);
             }
-        }
-
-        // Move From Encode Mode (UI Logic)
-        async function moveMapping() {
-            if (!currentPartId) return;
-            const drawerId = getDrawerString();
             
-            if (confirm(`確定要將零件 ${currentPartId} 移動到當前抽屜 ${drawerId} 嗎？\n(這將移除它在其他抽屜的所有紀錄)`)) {
-                if (window.moveMappingCloud) {
-                    await window.moveMappingCloud(currentPartId, drawerId, currentPartName, currentPartImgUrl);
-                    showMessage(`已移動: ${currentPartId} -> 抽屜 ${drawerId}`);
-                    
-                    document.getElementById('encode-preview').classList.add('hidden');
-                    document.getElementById('encode-preview-container').querySelector('i').classList.remove('hidden');
-                    document.getElementById('encode-actions').classList.add('hidden');
-                    document.getElementById('encode-duplicate-warning').classList.add('hidden'); 
-                    currentPartId = null;
-                    document.getElementById('encode-part-id-input').value = "---";
-                    updateDrawerStatus();
-                }
+            setupActionPanel(action, panelContainer);
+            // 預設填入空位
+            document.getElementById('drawer-input').value = getNextEmptyDrawerId();
+        };
+
+        function setupActionPanel(action, container) {
+            currentAction = action;
+            const template = document.getElementById('action-panel-template');
+            container.innerHTML = template.innerHTML; // Clone
+            
+            const btn = container.querySelector('#confirm-btn');
+            const label = container.querySelector('#action-label');
+            
+            if (action === 'add') {
+                btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i> 確認加入';
+                label.textContent = "加入到抽屜：";
+            } else {
+                btn.classList.add('bg-red-500', 'hover:bg-red-600');
+                btn.innerHTML = '<i class="fa-solid fa-arrow-right-arrow-left mr-2"></i> 確認移動 (覆蓋)';
+                label.textContent = "移動到抽屜：";
             }
+
+            // Bind events for the new elements
+            const input = container.querySelector('#drawer-input');
+            input.onclick = () => openKeypad(input.id); // Re-bind ID is tricky if duplicated, let's fix ID
+            
+            // To avoid ID conflict, we rely on the fact that only one panel is active at a time
+            // Or we just use global access since we clear previous ones.
+            // But 'drawer-input' id is in template.
+            
+            // Bind confirm
+            btn.onclick = executeAction;
         }
 
-        // ... existing image handling functions ...
-        function resizeImage(file, maxWidth = 800) {
+        window.adjustDrawer = (delta) => {
+            const input = document.getElementById('drawer-input'); // This gets the active one
+            if(!input) return;
+            let val = parseInt(input.value) || 1;
+            val += delta;
+            if(val < 1) val = 1;
+            if(val > 9999) val = 9999;
+            input.value = val;
+        };
+
+        window.executeAction = async () => {
+            if(!currentPartId) return;
+            const num = document.getElementById('drawer-input').value;
+            const isSub = document.getElementById('drawer-sub').checked;
+            const targetDrawer = isSub ? `${num}a` : `${num}`;
+            
+            const btn = document.querySelector('#confirm-btn'); // Active button
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 處理中...';
+            btn.disabled = true;
+
+            try {
+                if (currentAction === 'move') {
+                    if(confirm(`確定將 ${currentPartId} 移動到 ${targetDrawer} 嗎？\n舊位置將被移除。`)) {
+                        await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'move');
+                    }
+                } else {
+                    await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'append');
+                }
+                
+                // 成功後
+                // 不自動跳號，保持原位
+                // 只要重新整理顯示，狀態就會更新 (e.g. 從 New 變 Exist)
+                // 這裡我們手動觸發一次顯示更新 (雖然 onSnapshot 會觸發，但為了流暢感)
+                // 等待 snapshot 比較好。
+                
+                // 如果是在 "New" 狀態下加入，加入後應該清空 action panel 嗎？
+                // 為了連續作業，保留面板比較好，但要提示成功。
+                
+                // 簡單提示
+                const originalBg = btn.className;
+                btn.className = "w-full py-3 rounded-lg font-bold text-white shadow bg-green-500 transition-all";
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> 成功！';
+                
+                setTimeout(() => {
+                    btn.className = originalBg;
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                    // 如果是 New 模式，加入後其實變成了 Exist 模式，UI 會被 onSnapshot 重繪
+                    // 所以這裡不做太多 UI 重置
+                }, 1000);
+
+            } catch(e) {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        };
+
+        window.removeLoc = (drawerId) => {
+            if(confirm(`確定從 ${drawerId} 移除此零件？`)) {
+                window.removeMappingCloud(currentPartId, drawerId);
+            }
+        };
+
+        // --- Standard Image & AI Handlers (Simplified) ---
+        // (Copied from previous versions logic but cleaner)
+        window.handleImage = async (input) => {
+            if (!input.files[0]) return;
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('preview-img').src = e.target.result;
+                document.getElementById('preview-img').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('result-area').classList.add('hidden'); // Hide old result
+            
+            try {
+                const blob = await resizeImage(file);
+                currentResizedBlob = blob; // For retry
+                
+                // 1. Brickognize
+                let result = await tryBrickognize(blob);
+                
+                // 2. Gemini Fallback
+                if (!result) {
+                    if (geminiApiKey) {
+                        document.getElementById('loading-text').innerText = "切換至 Gemini AI...";
+                        result = await tryGemini(blob);
+                    } else { throw new Error("Brickognize 無結果且未設定 API Key"); }
+                }
+                
+                currentPartName = result.name;
+                currentPartImgUrl = result.img;
+                document.getElementById('find-part-id-input').value = result.id;
+                
+                // 顯示結果
+                checkAndDisplayDrawer(result.id);
+                document.getElementById('retry-btn').classList.remove('hidden');
+
+            } catch (e) {
+                alert(e.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+                input.value = '';
+            }
+        };
+        
+        window.manualSearch = () => {
+            const id = document.getElementById('part-id-input').value.trim();
+            if(id) checkAndDisplayDrawer(id);
+        };
+
+        window.retryWithGemini = async () => {
+             if(!currentResizedBlob || !geminiApiKey) { alert("無圖片或未設定 Key"); return; }
+             document.getElementById('loading').classList.remove('hidden');
+             document.getElementById('loading-text').innerText = "Gemini 重試中...";
+             try {
+                 const result = await tryGemini(currentResizedBlob);
+                 currentPartName = result.name;
+                 currentPartImgUrl = ""; // Gemini usually no img url
+                 document.getElementById('find-part-id-input').value = result.id;
+                 checkAndDisplayDrawer(result.id);
+             } catch(e) { alert(e.message); }
+             finally { document.getElementById('loading').classList.add('hidden'); }
+        };
+
+        // --- Helpers ---
+        function resizeImage(file) { /* ... same as before ... */ 
             return new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     const img = new Image();
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        let width = img.width;
-                        let height = img.height;
-                        if (width > maxWidth) {
-                            height = Math.round((height * maxWidth) / width);
-                            width = maxWidth;
-                        }
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
+                        let width = img.width, height = img.height;
+                        if (width > 800) { height = Math.round(height * 800 / width); width = 800; }
+                        canvas.width = width; canvas.height = height;
+                        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                        canvas.toBlob(resolve, 'image/jpeg', 0.85);
                     };
                     img.src = event.target.result;
                 };
                 reader.readAsDataURL(file);
             });
         }
+        
+        async function tryBrickognize(blob) {
+            const fd = new FormData(); fd.append('query_image', blob);
+            const res = await fetch('https://api.brickognize.com/predict/', {method:'POST', body:fd});
+            if(res.ok) {
+                const data = await res.json();
+                if(data.items?.length > 0) return { 
+                    id: data.items[0].id, 
+                    name: data.items[0].name, 
+                    img: data.items[0].img_url || data.items[0].thumbnail_url,
+                    source: 'Brickognize'
+                };
+            }
+            return null;
+        }
 
-        async function callGeminiVision(fileBlob) {
-            if (!geminiApiKey) throw new Error("請先設定 Google Gemini API Key");
-            const base64Data = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result.split(',')[1]);
-                reader.readAsDataURL(fileBlob);
+        async function tryGemini(blob) {
+            const b64 = await new Promise(r => { const rd = new FileReader(); rd.onloadend = () => r(rd.result.split(',')[1]); rd.readAsDataURL(blob); });
+            const prompt = `Identify this Lego part. Return JSON: { "id": "PART_ID", "name": "Part Name" }.`;
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ contents:[{parts:[{text:prompt}, {inline_data:{mime_type:"image/jpeg", data:b64}}]}], generationConfig:{responseMimeType:"application/json"} })
             });
-
-            const prompt = `
-                You are an expert Lego part identifier. Analyze this image.
-                1. Identify the main building block/part.
-                2. If it is a standard Lego part, return its official Design ID (e.g., "3001") and standard name.
-                3. If it is a non-standard, compatible brand (like CaDA, Sembo, Double Eagle), or specific Technic part:
-                   - Create a descriptive ID (e.g., "CADA_GEARBOX").
-                   - In the "name" field, include both the English description AND common Chinese product keywords found on Taobao (e.g., "雙鷹CaDA兼容樂高6588減速齒輪箱").
-                4. Return the result strictly as a JSON object with keys "id" and "name".
-                5. DO NOT output markdown code blocks.
-                Example Output: { "id": "3001", "name": "Brick 2 x 4" }
-            `;
-
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [ { text: prompt }, { inline_data: { mime_type: "image/jpeg", data: base64Data } } ]
-                    }],
-                    generationConfig: { responseMimeType: "application/json" }
-                })
-            });
-
-            if (!response.ok) {
-                const err = await response.json();
-                let errMsg = err.error?.message || response.statusText;
-                if(response.status === 429) errMsg = "API 額度不足 (429)。請切換至 1.5 Flash。";
-                if(response.status === 404) errMsg = "模型找不到 (404)。請切換模型設定。";
-                throw new Error(errMsg);
-            }
-
-            const result = await response.json();
-            const text = result.candidates[0].content.parts[0].text;
-            const jsonStr = text.replace(/```json|```/g, '').trim();
-            return JSON.parse(jsonStr);
+            if(!res.ok) throw new Error("API Error");
+            const json = await res.json();
+            const data = JSON.parse(json.candidates[0].content.parts[0].text);
+            return { id: data.id, name: data.name, img: "", source: 'Gemini' };
         }
 
-        async function retryWithGemini() {
-            if (!currentResizedBlob) {
-                showMessage("找不到圖片，請重新拍照", "error");
-                return;
+        // --- Keypad (Simplified) ---
+        window.k = (key) => {
+            const inp = document.getElementById('drawer-input'); // Always target the visible drawer-input
+            if(!inp) return;
+            if(key==='del') inp.value = inp.value.slice(0,-1);
+            else if(key==='clr') inp.value = '';
+            else if(key==='ok') closeKeypad();
+            else inp.value += key;
+        };
+        window.openKeypad = (id) => {
+            const modal = document.getElementById('keypad-modal');
+            const content = document.getElementById('keypad-content');
+            modal.classList.remove('hidden');
+            requestAnimationFrame(() => content.classList.remove('translate-y-full'));
+            document.getElementById('main-content').classList.add('pb-keypad');
+            // Scroll to ensure input visible
+            setTimeout(() => document.getElementById(id).scrollIntoView({behavior:'smooth', block:'center'}), 300);
+        };
+        window.closeKeypad = () => {
+            const modal = document.getElementById('keypad-modal');
+            document.getElementById('keypad-content').classList.add('translate-y-full');
+            setTimeout(() => { modal.classList.add('hidden'); document.getElementById('main-content').classList.remove('pb-keypad'); }, 300);
+        };
+
+        // Settings Toggles
+        window.toggleSettings = () => {
+            const m = document.getElementById('settings-modal');
+            m.classList.toggle('hidden');
+            if(!m.classList.contains('hidden')) {
+                document.getElementById('gemini-key').value = geminiApiKey;
+                document.getElementById('gemini-model').value = geminiModel;
             }
-            const mode = currentMode;
-            const loadingDiv = document.getElementById(`${mode}-loading`);
-            const loadingText = mode === 'find' ? document.getElementById('loading-text') : document.getElementById('encode-loading-text');
-            if (mode === 'find') document.getElementById('find-result').classList.add('hidden');
-            if (mode === 'encode') document.getElementById('encode-actions').classList.add('hidden');
-            loadingDiv.classList.remove('hidden');
-            loadingText.textContent = `正切換至 ${geminiModel} 重新辨識...`;
+        };
+        window.saveSettings = () => {
+            geminiApiKey = document.getElementById('gemini-key').value.trim();
+            geminiModel = document.getElementById('gemini-model').value;
+            localStorage.setItem('lego_gemini_key', geminiApiKey);
+            localStorage.setItem('lego_gemini_model', geminiModel);
+            toggleSettings();
+        };
 
-            try {
-                if (!geminiApiKey) throw new Error("請先在右上角設定 Gemini API Key");
-                const geminiResult = await callGeminiVision(currentResizedBlob);
-                const partId = geminiResult.id;
-                const partName = geminiResult.name;
-                currentPartId = partId;
-                currentPartName = partName;
-                currentPartImgUrl = ""; 
-                const sourceTagId = mode === 'find' ? 'find-source-tag' : 'encode-source-tag';
-                const sourceTag = document.getElementById(sourceTagId);
-                sourceTag.textContent = "Gemini (重試)";
-                sourceTag.className = `text-[10px] px-1 rounded text-white bg-purple-600`;
-
-                if (mode === 'find') {
-                    document.getElementById('find-part-id-input').value = partId;
-                    document.getElementById('find-refresh-btn').classList.add('hidden');
-                    document.getElementById('find-api-img').classList.add('hidden'); 
-                    document.getElementById('find-retry-gemini').classList.add('hidden'); 
-                    checkAndDisplayDrawer(partId);
-                    document.getElementById('find-result').classList.remove('hidden');
-                } else if (mode === 'encode') {
-                    document.getElementById('encode-part-id-input').value = partId;
-                    document.getElementById('encode-part-name').textContent = partName;
-                    document.getElementById('encode-api-img').classList.add('hidden');
-                    document.getElementById('encode-retry-gemini').classList.add('hidden');
-                    checkExistingLocation(partId); 
-                    document.getElementById('encode-actions').classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error(error);
-                showMessage(error.message, "error");
-            } finally {
-                loadingDiv.classList.add('hidden');
-            }
-        }
-
-        async function handleImage(input, mode) {
-            if (!input.files || !input.files[0]) return;
-            const originalFile = input.files[0];
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const imgId = mode === 'find' ? 'find-preview' : 'encode-preview';
-                const img = document.getElementById(imgId);
-                img.src = e.target.result;
-                img.classList.remove('hidden');
-                document.getElementById(`${mode}-preview-container`).querySelector('i').classList.add('hidden');
-            };
-            reader.readAsDataURL(originalFile);
-
-            const loadingDiv = document.getElementById(`${mode}-loading`);
-            const loadingText = mode === 'find' ? document.getElementById('loading-text') : document.getElementById('encode-loading-text');
-            loadingDiv.classList.remove('hidden');
-            loadingText.textContent = "正在壓縮並上傳 Brickognize...";
-            if (mode === 'find') {
-                document.getElementById('find-result').classList.add('hidden');
-                document.getElementById('find-quick-assign').classList.add('hidden');
-                document.getElementById('find-add-more').classList.add('hidden');
-                document.getElementById('find-move-panel-container').classList.add('hidden'); // Reset Move panel
-            }
-            if (mode === 'encode') document.getElementById('encode-actions').classList.add('hidden');
-
-            let partId, partName, imgUrl, source;
-
-            try {
-                const resizedBlob = await resizeImage(originalFile);
-                currentResizedBlob = resizedBlob; 
-                try {
-                    const fileToUpload = new File([resizedBlob], "query.jpg", { type: "image/jpeg" });
-                    const formData = new FormData();
-                    formData.append('query_image', fileToUpload);
-                    const response = await fetch('https://api.brickognize.com/predict/', { method: 'POST', body: formData });
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.items && data.items.length > 0) {
-                            const topItem = data.items[0];
-                            partId = topItem.id;
-                            partName = topItem.name;
-                            imgUrl = topItem.img_url || topItem.thumbnail_url || "";
-                            source = "Brickognize";
-                        }
-                    }
-                } catch (e) { console.warn("Brickognize failed", e); }
-
-                if (!partId) {
-                    if (geminiApiKey) {
-                        loadingText.textContent = `Brickognize 未識別，正在切換至 ${geminiModel}...`;
-                        const geminiResult = await callGeminiVision(resizedBlob);
-                        partId = geminiResult.id;
-                        partName = geminiResult.name;
-                        source = "Gemini AI";
-                        imgUrl = ""; 
-                    } else { throw new Error("無法辨識。Brickognize 無結果，且未設定 Gemini API Key。"); }
-                }
-
-                currentPartId = partId;
-                currentPartName = partName;
-                currentPartImgUrl = imgUrl;
-
-                const sourceTagId = mode === 'find' ? 'find-source-tag' : 'encode-source-tag';
-                const sourceTag = document.getElementById(sourceTagId);
-                sourceTag.textContent = source;
-                sourceTag.className = `text-[10px] px-1 rounded text-white ${source === 'Brickognize' ? 'bg-green-500' : 'bg-purple-500'}`;
-
-                const retryBtnId = mode === 'find' ? 'find-retry-gemini' : 'encode-retry-gemini';
-                const retryBtn = document.getElementById(retryBtnId);
-                if (source === 'Brickognize') retryBtn.classList.remove('hidden');
-                else retryBtn.classList.add('hidden');
-
-                if (mode === 'find') {
-                    document.getElementById('find-part-id-input').value = partId;
-                    document.getElementById('find-refresh-btn').classList.add('hidden');
-                    const resultImg = document.getElementById('find-api-img');
-                    if(imgUrl) { resultImg.src = imgUrl; resultImg.classList.remove('hidden'); } 
-                    else { resultImg.classList.add('hidden'); }
-                    
-                    checkAndDisplayDrawer(partId);
-                    document.getElementById('find-result').classList.remove('hidden');
-                } else if (mode === 'encode') {
-                    document.getElementById('encode-part-id-input').value = partId;
-                    document.getElementById('encode-part-name').textContent = partName;
-                    const actionImg = document.getElementById('encode-api-img');
-                    if(imgUrl) { actionImg.src = imgUrl; actionImg.classList.remove('hidden'); } 
-                    else { actionImg.classList.add('hidden'); }
-                    
-                    checkExistingLocation(partId); 
-                    document.getElementById('encode-actions').classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error(error);
-                showMessage(error.message, "error");
-            } finally {
-                loadingDiv.classList.add('hidden');
-                input.value = ''; 
-            }
-        }
-
-        function manualUpdateId(mode) {
-            const inputId = mode === 'find' ? 'find-part-id-input' : 'encode-part-id-input';
-            const newId = document.getElementById(inputId).value.trim();
-            if (!newId) return;
-            currentPartId = newId;
-            if (mode === 'find') { document.getElementById('find-refresh-btn').classList.remove('hidden'); } 
-            else { showMessage(`ID 已修改為: ${newId}`, "success"); checkExistingLocation(newId); }
-        }
-
-        function refreshFindResult() {
-            if (!currentPartId) return;
-            checkAndDisplayDrawer(currentPartId);
-            document.getElementById('find-refresh-btn').classList.add('hidden');
-        }
-
-        function checkAndDisplayDrawer(partId) {
-            const partData = (window.mappings || {})[partId];
-            const drawers = partData ? partData.drawers : []; 
-            const drawerDisplay = document.getElementById('find-drawer-id');
-            
-            if (drawers && drawers.length > 0) {
-                drawerDisplay.textContent = drawers.map(d => `抽屜 ${d}`).join(', ');
-                drawerDisplay.className = "text-2xl font-bold text-blue-600 break-words";
-                document.getElementById('find-quick-assign').classList.add('hidden');
-                document.getElementById('find-add-more').classList.remove('hidden');
-                document.getElementById('find-move-panel-container').classList.remove('hidden'); // Show Move panel
-            } else {
-                drawerDisplay.textContent = "未登錄";
-                drawerDisplay.className = "text-4xl font-bold text-red-500";
-                document.getElementById('find-quick-assign').classList.remove('hidden');
-                document.getElementById('find-add-more').classList.add('hidden');
-                document.getElementById('find-move-panel-container').classList.add('hidden');
-                document.getElementById('find-drawer-input').value = getNextEmptyDrawerId();
-                document.getElementById('find-drawer-sub').checked = false;
-            }
-        }
-
-        function toggleQuickAdd() {
-            const panel = document.getElementById('quick-add-panel');
-            panel.classList.toggle('hidden');
-            if (!panel.classList.contains('hidden')) {
-                document.getElementById('add-drawer-input').value = getNextEmptyDrawerId();
-                document.getElementById('add-drawer-sub').checked = false;
-            }
-        }
-
-        function toggleQuickMove() {
-            const panel = document.getElementById('quick-move-panel');
-            panel.classList.toggle('hidden');
-        }
-
-        async function saveFromFindMode(isAddMore = false) {
-            if (!currentPartId) return;
-            let num, isSub;
-            if (isAddMore) {
-                num = document.getElementById('add-drawer-input').value;
-                isSub = document.getElementById('add-drawer-sub').checked;
-            } else {
-                num = document.getElementById('find-drawer-input').value;
-                isSub = document.getElementById('find-drawer-sub').checked;
-            }
-            const drawerId = isSub ? `${num}a` : `${num}`;
-            if (window.saveMappingCloud) {
-                await window.saveMappingCloud(currentPartId, drawerId, currentPartName, currentPartImgUrl);
-                showMessage(`已新增: ${currentPartId} -> 抽屜 ${drawerId}`);
-                document.getElementById('quick-add-panel').classList.add('hidden');
-                if (!isAddMore) document.getElementById('find-quick-assign').classList.add('hidden');
-                checkAndDisplayDrawer(currentPartId);
-            }
-        }
-
-        function saveMapping() {
-            if (!currentPartId) return;
-            const drawerId = getDrawerString();
-            const partData = (window.mappings || {})[currentPartId];
-            const drawers = partData ? partData.drawers : [];
-            if (drawers.includes(drawerId)) {
-                alert(`零件 ${currentPartId} 已經在抽屜 ${drawerId} 了。`);
-                return;
-            }
-            if (drawers.length > 0) {
-                 if(!confirm(`此零件已存在於 [${drawers.join(', ')}]。\n確定要「增加」一個新位置 (抽屜 ${drawerId}) 嗎？`)) return;
-            }
-            if (window.saveMappingCloud) {
-                window.saveMappingCloud(currentPartId, drawerId, currentPartName, currentPartImgUrl);
-                showMessage(`已新增位置: ${currentPartId} -> 抽屜 ${drawerId}`);
-                document.getElementById('encode-preview').classList.add('hidden');
-                document.getElementById('encode-preview-container').querySelector('i').classList.remove('hidden');
-                document.getElementById('encode-actions').classList.add('hidden');
-                document.getElementById('encode-duplicate-warning').classList.add('hidden'); 
-                currentPartId = null;
-                document.getElementById('encode-part-id-input').value = "---";
-            }
-        }
-
-        function removeMapping(partId, drawerId) {
-            if (confirm(`確定要從抽屜 ${drawerId} 移除零件 ${partId} 嗎？`)) {
-                if (window.removeMappingCloud) window.removeMappingCloud(partId, drawerId);
-            }
-        }
+        if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
     </script>
+    
+    <!-- Keypad UI -->
+    <div id="keypad-modal" class="fixed inset-0 z-[70] hidden flex items-end justify-center pointer-events-none">
+        <div class="bg-white w-full max-w-md shadow-2xl rounded-t-2xl p-4 pointer-events-auto transform transition-transform duration-300 translate-y-full" id="keypad-content">
+            <div class="flex justify-between mb-2"><span class="font-bold text-gray-500">輸入號碼</span><button onclick="closeKeypad()"><i class="fa-solid fa-chevron-down"></i></button></div>
+            <div class="grid grid-cols-4 gap-2">
+                <button onclick="k('1')" class="bg-gray-50 border rounded p-3 text-xl font-bold">1</button>
+                <button onclick="k('2')" class="bg-gray-50 border rounded p-3 text-xl font-bold">2</button>
+                <button onclick="k('3')" class="bg-gray-50 border rounded p-3 text-xl font-bold">3</button>
+                <button onclick="k('del')" class="bg-red-50 border border-red-200 rounded p-3 text-red-500"><i class="fa-solid fa-delete-left"></i></button>
+                <button onclick="k('4')" class="bg-gray-50 border rounded p-3 text-xl font-bold">4</button>
+                <button onclick="k('5')" class="bg-gray-50 border rounded p-3 text-xl font-bold">5</button>
+                <button onclick="k('6')" class="bg-gray-50 border rounded p-3 text-xl font-bold">6</button>
+                <button onclick="k('ok')" class="bg-blue-600 rounded p-3 text-white font-bold row-span-3 flex items-center justify-center">OK</button>
+                <button onclick="k('7')" class="bg-gray-50 border rounded p-3 text-xl font-bold">7</button>
+                <button onclick="k('8')" class="bg-gray-50 border rounded p-3 text-xl font-bold">8</button>
+                <button onclick="k('9')" class="bg-gray-50 border rounded p-3 text-xl font-bold">9</button>
+                <button onclick="k('clr')" class="bg-gray-200 border rounded p-3 text-xs font-bold">CLR</button>
+                <button onclick="k('0')" class="bg-gray-50 border rounded p-3 text-xl font-bold col-span-2">0</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
