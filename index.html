@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂高抽屜管家 (極速拍照版)</title>
+    <title>樂高抽屜管家 (超連結導航版)</title>
     
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -230,7 +230,7 @@
                         <div id="drawer-list" class="flex flex-wrap gap-2"></div>
                     </div>
                     
-                    <!-- NEW: Similar parts for reference when part EXISTS -->
+                    <!-- Exist Similar Parts -->
                     <div id="exist-similar-suggestions" class="mt-4 pt-4 border-t border-gray-100 hidden">
                         <p class="text-xs font-bold text-gray-500 mb-2 flex items-center"><i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-500"></i> 相似零件參考：</p>
                         <div id="exist-similar-list" class="space-y-2"></div>
@@ -274,6 +274,24 @@
         </div>
     </main>
 
+    <!-- NEW: Drawer Content Modal -->
+    <div id="drawer-modal" class="fixed inset-0 z-[80] hidden flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl flex flex-col max-h-[80vh]">
+            <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                <h3 class="font-bold text-lg text-gray-800 flex items-center">
+                    <i class="fa-solid fa-box-open text-blue-600 mr-2"></i>
+                    <span id="drawer-modal-title">抽屜內容</span>
+                </h3>
+                <button onclick="closeDrawerModal()" class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="drawer-modal-content" class="p-4 overflow-y-auto grid grid-cols-3 gap-3 bg-gray-50/50">
+                <!-- Parts go here -->
+            </div>
+        </div>
+    </div>
+
     <!-- NEW: Live Camera Overlay -->
     <div id="camera-overlay" class="fixed inset-0 bg-black z-[90] hidden flex flex-col">
         <div class="relative flex-1 bg-black overflow-hidden flex items-center justify-center">
@@ -302,12 +320,15 @@
                 <button onclick="k('1')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">1</button>
                 <button onclick="k('2')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">2</button>
                 <button onclick="k('3')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">3</button>
+                
                 <button onclick="k('4')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">4</button>
                 <button onclick="k('5')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">5</button>
                 <button onclick="k('6')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">6</button>
+                
                 <button onclick="k('7')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">7</button>
                 <button onclick="k('8')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">8</button>
                 <button onclick="k('9')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">9</button>
+                
                 <button onclick="k('clr')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-lg font-bold active:border-b-0 active:translate-y-1 transition-all">清空</button>
                 <button onclick="k('0')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">0</button>
                 <button onclick="k('ok')" class="bg-blue-600 border-b-4 border-blue-800 rounded-xl p-3 text-white text-xl font-bold active:border-b-0 active:translate-y-1 transition-all">OK</button>
@@ -478,10 +499,10 @@
                     const num = parseInt(d.toString().replace('a',''));
                     const label = num > 477 ? `<i class="fa-solid fa-bag-shopping mr-1"></i>夾鏈袋 ${d}` : `<i class="fa-solid fa-box-open mr-1"></i>抽屜 ${d}`;
                     const bgClass = num > 477 ? "bg-purple-100 text-purple-800 border-purple-200" : "bg-green-50 text-green-800 border-green-200";
-                    return `<div class="${bgClass} border px-3 py-1.5 rounded-lg font-bold shadow-sm flex items-center text-sm">${label}<button onclick="removeLoc('${d}')" class="ml-3 w-5 h-5 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm transition"><i class="fa-solid fa-xmark text-xs"></i></button></div>`;
+                    // UPDATED: Added onclick to open drawer content
+                    return `<div class="${bgClass} border px-3 py-1.5 rounded-lg font-bold shadow-sm flex items-center text-sm"><span onclick="openDrawerContent('${d.toString().replace('a','')}')" class="cursor-pointer flex items-center">${label}</span><button onclick="removeLoc('${d}')" class="ml-3 w-5 h-5 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm transition"><i class="fa-solid fa-xmark text-xs"></i></button></div>`;
                 }).join('');
 
-                // NEW: Show similar parts for existing parts too
                 const similarContainer = document.getElementById('exist-similar-suggestions');
                 const similarList = document.getElementById('exist-similar-list');
                 const suggestions = findSimilarParts(currentPartName || "");
@@ -489,7 +510,8 @@
                     similarList.innerHTML = suggestions.map(s => {
                         const dNum = parseInt(s.drawers[0].toString().replace('a',''));
                         const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
-                        return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg shadow-sm"><div class="flex-1 min-w-0"><div class="text-xs font-bold text-gray-700 truncate">${s.name}</div><div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div></div><span class="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded transition">${locLabel}</span></div>`;
+                        // UPDATED: Added onclick to open drawer content
+                        return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg shadow-sm"><div class="flex-1 min-w-0"><div class="text-xs font-bold text-gray-700 truncate">${s.name}</div><div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div></div><span onclick="event.stopPropagation(); openDrawerContent('${s.drawers[0].toString().replace('a','')}')" class="cursor-pointer text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded transition hover:bg-purple-200">${locLabel}</span></div>`;
                     }).join('');
                     similarContainer.classList.remove('hidden');
                 } else { similarContainer.classList.add('hidden'); }
@@ -500,14 +522,14 @@
                 document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-yellow-400 transition-all"; 
                 setupActionPanel('add', document.getElementById('inline-action-panel'));
                 const inp = document.getElementById('drawer-input-active'); if(inp) inp.value = getNextEmptyDrawerId();
-                
                 const similarList = document.getElementById('similar-list');
                 const suggestions = findSimilarParts(currentPartName || "");
                 if (suggestions.length > 0) {
                     similarList.innerHTML = suggestions.map(s => {
                         const dNum = parseInt(s.drawers[0].toString().replace('a',''));
                         const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
-                        return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg cursor-pointer hover:bg-purple-50 transition shadow-sm group" onclick="useSuggestedDrawer('${s.drawers[0]}')">${s.img?`<img src="${s.img}" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-400"></i></div>'}<div class="flex-1 min-w-0"><div class="text-xs font-bold text-gray-700 truncate">${s.name}</div><div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div></div><span class="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded group-hover:bg-purple-200 transition">${locLabel}</span></div>`;
+                        // UPDATED: Added onclick to open drawer content
+                        return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg cursor-pointer hover:bg-purple-50 transition shadow-sm group" onclick="useSuggestedDrawer('${s.drawers[0]}')">${s.img?`<img src="${s.img}" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-400"></i></div>'}<div class="flex-1 min-w-0"><div class="text-xs font-bold text-gray-700 truncate">${s.name}</div><div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div></div><span onclick="event.stopPropagation(); openDrawerContent('${s.drawers[0].toString().replace('a','')}')" class="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded group-hover:bg-purple-200 transition">${locLabel}</span></div>`;
                     }).join('');
                     document.getElementById('similar-suggestions').classList.remove('hidden');
                 } else { document.getElementById('similar-suggestions').classList.add('hidden'); }
@@ -530,6 +552,42 @@
         window.toggleSettings = () => { const m = document.getElementById('settings-modal'); m.classList.toggle('hidden'); if(!m.classList.contains('hidden')) { document.getElementById('gemini-key').value = geminiApiKey; document.getElementById('gemini-model').value = geminiModel; if(geminiApiKey) document.getElementById('key-saved-msg').classList.remove('hidden'); else document.getElementById('key-saved-msg').classList.add('hidden'); } };
         window.saveSettings = () => { geminiApiKey = document.getElementById('gemini-key').value.trim(); geminiModel = document.getElementById('gemini-model').value; localStorage.setItem('lego_gemini_key', geminiApiKey); localStorage.setItem('lego_gemini_model', geminiModel); toggleSettings(); showMessage("設定已儲存", "success"); };
         if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
+
+        // --- NEW: Drawer Modal Logic ---
+        window.openDrawerContent = (drawerId) => {
+            const modal = document.getElementById('drawer-modal');
+            const title = document.getElementById('drawer-modal-title');
+            const content = document.getElementById('drawer-modal-content');
+            
+            const dStr = drawerId.toString();
+            const num = parseInt(dStr.replace('a',''));
+            const prefix = num > 477 ? "夾鏈袋" : "抽屜";
+            title.textContent = `${prefix} ${dStr}`;
+            
+            const partsInDrawer = [];
+            Object.entries(window.mappings).forEach(([pid, data]) => {
+                if (data.drawers && (data.drawers.includes(dStr) || data.drawers.includes(dStr+'a') || data.drawers.includes(dStr.replace('a','')))) {
+                    // Check exact match first, handling 'a' suffix loosely if needed, but precise is better
+                    if(data.drawers.includes(dStr)) partsInDrawer.push({ id: pid, ...data });
+                }
+            });
+
+            if (partsInDrawer.length === 0) {
+                content.innerHTML = '<div class="col-span-3 text-center text-gray-400 py-8">此位置是空的</div>';
+            } else {
+                content.innerHTML = partsInDrawer.map(p => `
+                    <div class="flex flex-col items-center p-2 border rounded-lg hover:bg-blue-50 cursor-pointer transition bg-white" onclick="selectPartFromDrawer('${p.id}')">
+                        ${p.img ? `<img src="${p.img}" class="w-16 h-16 object-contain mb-2">` : `<div class="w-16 h-16 bg-gray-100 rounded flex items-center justify-center mb-2"><i class="fa-solid fa-cube text-gray-300 text-2xl"></i></div>`}
+                        <span class="font-bold text-xs text-blue-600 font-mono break-all text-center">${p.id}</span>
+                        <span class="text-[10px] text-gray-500 truncate w-full text-center mt-1">${p.name}</span>
+                    </div>
+                `).join('');
+            }
+            modal.classList.remove('hidden');
+        };
+
+        window.closeDrawerModal = () => { document.getElementById('drawer-modal').classList.add('hidden'); };
+        window.selectPartFromDrawer = (partId) => { closeDrawerModal(); checkAndDisplayDrawer(partId); };
     </script>
 </body>
 </html>
