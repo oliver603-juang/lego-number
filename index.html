@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂高抽屜管家 (全能字典+夾鏈袋版)</title>
+    <title>樂高抽屜管家 (極速拍照版)</title>
     
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -40,60 +40,43 @@
         } catch (e) { console.error("Init Error", e); }
 
         window.mappings = {}; 
-        window.inventoryIndex = []; // 已存零件索引
+        window.inventoryIndex = []; 
 
-        // --- 擴充版常用零件字典 (參考 Brick Architect) ---
+        // --- 擴充版常用零件字典 (維持不變) ---
         window.catalogIndex = [
-            // Bricks (Basic)
             {id: "3001", name: "Brick 2 x 4"}, {id: "3002", name: "Brick 2 x 3"}, {id: "3003", name: "Brick 2 x 2"}, 
             {id: "3004", name: "Brick 1 x 2"}, {id: "3005", name: "Brick 1 x 1"}, {id: "3008", name: "Brick 1 x 8"}, 
             {id: "3009", name: "Brick 1 x 6"}, {id: "3010", name: "Brick 1 x 4"}, {id: "3007", name: "Brick 2 x 8"},
             {id: "2453", name: "Brick 1 x 1 x 5"}, {id: "2454", name: "Brick 1 x 2 x 5"},
-            // Plates
             {id: "3020", name: "Plate 2 x 4"}, {id: "3021", name: "Plate 2 x 3"}, {id: "3022", name: "Plate 2 x 2"}, 
             {id: "3023", name: "Plate 1 x 2"}, {id: "3024", name: "Plate 1 x 1"}, {id: "3623", name: "Plate 1 x 3"}, 
             {id: "3710", name: "Plate 1 x 4"}, {id: "3666", name: "Plate 1 x 6"}, {id: "3460", name: "Plate 1 x 8"},
             {id: "3032", name: "Plate 4 x 6"}, {id: "3034", name: "Plate 2 x 8"}, {id: "3031", name: "Plate 4 x 4"},
             {id: "3035", name: "Plate 4 x 8"}, {id: "3030", name: "Plate 4 x 10"},
-            // Tiles
             {id: "3068b", name: "Tile 2 x 2 with Groove"}, {id: "3069b", name: "Tile 1 x 2 with Groove"}, 
             {id: "3070b", name: "Tile 1 x 1 with Groove"}, {id: "6636", name: "Tile 1 x 6"}, {id: "2431", name: "Tile 1 x 4"},
             {id: "4150", name: "Tile, Round 2 x 2"}, {id: "98138", name: "Tile, Round 1 x 1"}, {id: "14769", name: "Tile, Round 2 x 2 with Bottom Stud Holder"},
             {id: "87079", name: "Tile 2 x 4"}, {id: "63864", name: "Tile 1 x 3"},
             {id: "2412b", name: "Tile, Modified 1 x 2 Grille (Radiator)"}, 
-            // Slopes
             {id: "3039", name: "Slope 45 2 x 2"}, {id: "3040", name: "Slope 45 2 x 1"}, {id: "3298", name: "Slope 33 3 x 2"},
             {id: "85984", name: "Slope 30 1 x 2 x 2/3"}, {id: "54200", name: "Slope 30 1 x 1 x 2/3 (Cheese Slope)"},
             {id: "3660", name: "Slope, Inverted 45 2 x 2"}, {id: "3665", name: "Slope, Inverted 45 2 x 1"},
             {id: "11477", name: "Slope, Curved 2 x 1 No Studs"}, {id: "15068", name: "Slope, Curved 2 x 2 x 2/3"},
-            // SNOT & Modified
-            {id: "87087", name: "Brick, Modified 1 x 1 with Stud on 1 Side"}, 
-            {id: "4070", name: "Brick, Modified 1 x 1 with Headlight"},
-            {id: "4733", name: "Brick, Modified 1 x 1 with Studs on 4 Sides"},
-            {id: "2420", name: "Plate, Corner 2 x 2"}, 
-            {id: "15573", name: "Plate, Modified 1 x 2 with 1 Stud (Jumper)"}, 
-            {id: "3794b", name: "Plate, Modified 1 x 2 with 1 Stud (Jumper)"},
-            {id: "87580", name: "Plate, Modified 2 x 2 with Groove and 1 Stud in Center (Jumper)"},
-            {id: "11458", name: "Plate, Modified 1 x 2 with Pin Hole on Top"},
-            // Technic
-            {id: "3700", name: "Technic, Brick 1 x 2 with Hole"}, 
-            {id: "3894", name: "Technic, Brick 1 x 6 with Holes"}, 
+            {id: "87087", name: "Brick, Modified 1 x 1 with Stud on 1 Side"}, {id: "4070", name: "Brick, Modified 1 x 1 with Headlight"},
+            {id: "4733", name: "Brick, Modified 1 x 1 with Studs on 4 Sides"}, {id: "2420", name: "Plate, Corner 2 x 2"}, 
+            {id: "15573", name: "Plate, Modified 1 x 2 with 1 Stud (Jumper)"}, {id: "3794b", name: "Plate, Modified 1 x 2 with 1 Stud (Jumper)"},
+            {id: "87580", name: "Plate, Modified 2 x 2 with Groove and 1 Stud in Center (Jumper)"}, {id: "11458", name: "Plate, Modified 1 x 2 with Pin Hole on Top"},
+            {id: "3700", name: "Technic, Brick 1 x 2 with Hole"}, {id: "3894", name: "Technic, Brick 1 x 6 with Holes"}, 
             {id: "32062", name: "Technic, Axle 2 Notched"}, {id: "4519", name: "Technic, Axle 3"},
             {id: "3705", name: "Technic, Axle 4"}, {id: "3706", name: "Technic, Axle 6"}, 
-            {id: "32523", name: "Technic, Liftarm Thick 1 x 3"},
-            {id: "32524", name: "Technic, Liftarm Thick 1 x 7"}, 
-            {id: "32278", name: "Technic, Liftarm Thick 1 x 15"},
-            {id: "2780", name: "Technic, Pin with Friction Ridges"}, {id: "3673", name: "Technic, Pin without Friction Ridges"},
-            {id: "43093", name: "Technic, Axle Pin with Friction Ridges"},
-            // Wedges & Clips
+            {id: "32523", name: "Technic, Liftarm Thick 1 x 3"}, {id: "32524", name: "Technic, Liftarm Thick 1 x 7"}, 
+            {id: "32278", name: "Technic, Liftarm Thick 1 x 15"}, {id: "2780", name: "Technic, Pin with Friction Ridges"}, 
+            {id: "3673", name: "Technic, Pin without Friction Ridges"}, {id: "43093", name: "Technic, Axle Pin with Friction Ridges"},
             {id: "24299", name: "Wedge, Plate 2 x 2 Left"}, {id: "24307", name: "Wedge, Plate 2 x 2 Right"},
             {id: "54383", name: "Wedge, Plate 3 x 6 Cut Corners"}, {id: "54384", name: "Wedge, Plate 6 x 3 Left"},
-            {id: "2555", name: "Tile, Modified 1 x 1 with Clip"},
-            {id: "4085d", name: "Plate, Modified 1 x 1 with Clip Vertical"},
-            {id: "4081b", name: "Plate, Modified 1 x 1 with Clip Light"},
-            {id: "61252", name: "Plate, Modified 1 x 1 with Clip Horizontal"}
+            {id: "2555", name: "Tile, Modified 1 x 1 with Clip"}, {id: "4085d", name: "Plate, Modified 1 x 1 with Clip Vertical"},
+            {id: "4081b", name: "Plate, Modified 1 x 1 with Clip Light"}, {id: "61252", name: "Plate, Modified 1 x 1 with Clip Horizontal"}
         ].map(i => ({...i, searchStr: `${i.id} ${i.name}`.toLowerCase()}));
-
 
         async function initApp() {
             if (!auth) return;
@@ -112,35 +95,19 @@
             onSnapshot(collRef, (snapshot) => {
                 const newMappings = {};
                 const newIndex = [];
-
                 snapshot.forEach((doc) => {
                     const data = doc.data();
                     let drawers = [];
                     if (Array.isArray(data.drawers)) drawers = data.drawers;
                     else if (data.drawer_id) drawers = [data.drawer_id];
-                    
-                    const partData = {
-                        drawers: drawers,
-                        name: data.part_name || "",
-                        img: data.img_url || "" 
-                    };
-
+                    const partData = { drawers: drawers, name: data.part_name || "", img: data.img_url || "" };
                     if (drawers.length > 0) {
                         newMappings[doc.id] = partData;
-                        // Build Inventory Search Index
-                        newIndex.push({
-                            id: doc.id,
-                            name: partData.name,
-                            img: partData.img,
-                            drawers: drawers,
-                            type: 'inventory', // 標記為庫存
-                            searchStr: `${doc.id} ${partData.name}`.toLowerCase()
-                        });
+                        newIndex.push({ id: doc.id, name: partData.name, img: partData.img, drawers: drawers, type: 'inventory', searchStr: `${doc.id} ${partData.name}`.toLowerCase() });
                     }
                 });
                 window.mappings = newMappings;
                 window.inventoryIndex = newIndex;
-
                 if (currentPartId) checkAndDisplayDrawer(currentPartId);
             });
         }
@@ -153,43 +120,20 @@
                 const docSnap = await getDoc(docRef);
                 if (mode === 'move') { 
                     const oldData = docSnap.exists() ? docSnap.data() : {};
-                    await (docSnap.exists() ? updateDoc : setDoc)(docRef, {
-                        part_id: partId,
-                        drawers: [drawerId], 
-                        part_name: partName || oldData.part_name || "",
-                        img_url: imgUrl ? imgUrl : (oldData.img_url || ""),
-                        updated_at: new Date().toISOString()
-                    });
+                    await (docSnap.exists() ? updateDoc : setDoc)(docRef, { part_id: partId, drawers: [drawerId], part_name: partName || oldData.part_name || "", img_url: imgUrl ? imgUrl : (oldData.img_url || ""), updated_at: new Date().toISOString() });
                 } else { 
                     if (docSnap.exists()) {
-                        await updateDoc(docRef, {
-                            drawers: arrayUnion(drawerId),
-                            part_name: partName || docSnap.data().part_name,
-                            img_url: imgUrl ? imgUrl : docSnap.data().img_url,
-                            updated_at: new Date().toISOString()
-                        });
+                        await updateDoc(docRef, { drawers: arrayUnion(drawerId), part_name: partName || docSnap.data().part_name, img_url: imgUrl ? imgUrl : docSnap.data().img_url, updated_at: new Date().toISOString() });
                     } else {
-                        await setDoc(docRef, {
-                            part_id: partId,
-                            drawers: [drawerId],
-                            part_name: partName,
-                            img_url: imgUrl || "",
-                            updated_at: new Date().toISOString()
-                        });
+                        await setDoc(docRef, { part_id: partId, drawers: [drawerId], part_name: partName, img_url: imgUrl || "", updated_at: new Date().toISOString() });
                     }
                 }
-            } catch (e) {
-                alert("儲存失敗: " + e.message);
-                throw e;
-            }
+            } catch (e) { alert("儲存失敗: " + e.message); throw e; }
         };
 
         window.removeMappingCloud = async (partId, drawerIdToRemove) => {
             if (!db) return;
-            try {
-                const docRef = doc(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings', partId);
-                await updateDoc(docRef, { drawers: arrayRemove(drawerIdToRemove) });
-            } catch (e) { alert("刪除失敗"); }
+            try { const docRef = doc(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings', partId); await updateDoc(docRef, { drawers: arrayRemove(drawerIdToRemove) }); } catch (e) { alert("刪除失敗"); }
         };
 
         window.clearAllCloudData = async () => {
@@ -197,16 +141,10 @@
             const collRef = collection(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings');
             const snapshot = await getDocs(collRef);
             const batchSize = 500;
-            let batch = writeBatch(db);
-            let count = 0;
-            for (const doc of snapshot.docs) {
-                batch.delete(doc.ref);
-                count++;
-                if (count >= batchSize) { await batch.commit(); batch = writeBatch(db); count = 0; }
-            }
+            let batch = writeBatch(db); let count = 0;
+            for (const doc of snapshot.docs) { batch.delete(doc.ref); count++; if (count >= batchSize) { await batch.commit(); batch = writeBatch(db); count = 0; } }
             if (count > 0) await batch.commit();
-            alert("已清空資料庫");
-            toggleSettings();
+            alert("已清空資料庫"); toggleSettings();
         };
 
         initApp();
@@ -215,8 +153,7 @@
         body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* 增加底部邊距，避免被鍵盤擋住，特別是手機上 */
-        .pb-keypad { padding-bottom: 400px !important; } 
+        .pb-keypad { padding-bottom: 350px; } 
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         .suggestion-item.active { background-color: #ebf8ff; border-left: 4px solid #3b82f6; }
     </style>
@@ -239,23 +176,26 @@
         
         <!-- 1. 統一搜尋區 -->
         <div class="bg-white p-6 rounded-xl shadow-lg text-center mb-6 relative z-30">
-            <div class="mb-4 relative group cursor-pointer" onclick="document.getElementById('camera-input').click()">
+            <!-- New: Action Click to Start Live Camera -->
+            <div class="mb-4 relative group cursor-pointer" onclick="startCamera()">
                 <div id="preview-container" class="w-full h-40 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative transition hover:border-blue-400 hover:bg-blue-50">
                     <div class="text-gray-400 flex flex-col items-center">
                         <i class="fa-solid fa-camera text-4xl mb-2"></i>
-                        <span class="text-sm font-bold">點擊拍照辨識</span>
+                        <span class="text-sm font-bold">點擊開啟相機</span>
                     </div>
+                    <!-- Captured Image Preview -->
                     <img id="preview-img" class="absolute inset-0 w-full h-full object-contain hidden" />
                 </div>
             </div>
-            <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleImage(this)">
+            <!-- Backup Input for file upload -->
+            <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleImageFile(this.files[0])">
 
             <div id="loading" class="hidden flex flex-col items-center justify-center py-4">
                 <div class="loader mb-2"></div>
                 <span id="loading-text" class="text-xs text-gray-500">處理中...</span>
             </div>
 
-            <!-- Manual Input with Enhanced Autocomplete -->
+            <!-- Manual Input -->
             <div class="relative">
                 <div class="flex items-center border-b-2 border-gray-200 focus-within:border-blue-500 py-2 px-2 mt-2">
                     <i class="fa-solid fa-keyboard text-gray-400 mr-3"></i>
@@ -264,19 +204,14 @@
                         <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Gemini
                     </button>
                 </div>
-                <!-- Search Suggestions Dropdown -->
-                <div id="search-suggestions" class="absolute top-full left-0 right-0 bg-white shadow-xl rounded-b-xl border border-t-0 border-gray-200 max-h-72 overflow-y-auto hidden z-40">
-                    <!-- Items will be injected here -->
-                </div>
+                <div id="search-suggestions" class="absolute top-full left-0 right-0 bg-white shadow-xl rounded-b-xl border border-t-0 border-gray-200 max-h-72 overflow-y-auto hidden z-40"></div>
             </div>
         </div>
 
-        <!-- 2. 結果與操作區 (動態內容) -->
+        <!-- 2. 結果與操作區 -->
         <div id="result-area" class="hidden space-y-4">
-            
             <!-- 資訊卡 -->
             <div class="bg-white p-4 rounded-xl shadow-lg border-l-4" id="info-card">
-                <!-- 頭部資訊 -->
                 <div class="flex items-start mb-4">
                     <img id="api-img" src="" class="w-20 h-20 object-contain bg-gray-50 rounded border border-gray-200 mr-4 hidden">
                     <div class="flex-1 min-w-0">
@@ -288,80 +223,71 @@
                     </div>
                 </div>
 
-                <!-- 狀態 A: 已存在 (顯示位置 + 操作按鈕) -->
+                <!-- 狀態 A: 已存在 -->
                 <div id="status-exist" class="hidden">
                     <div class="mb-4">
                         <p class="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Current Location</p>
-                        <div id="drawer-list" class="flex flex-wrap gap-2">
-                            <!-- Tags go here -->
-                        </div>
+                        <div id="drawer-list" class="flex flex-wrap gap-2"></div>
                     </div>
-                    
-                    <!-- 按鈕群 -->
                     <div class="grid grid-cols-2 gap-3" id="exist-actions">
-                        <button onclick="showActionPanel('add')" class="bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-lg font-bold text-sm hover:bg-blue-100 flex justify-center items-center">
-                            <i class="fa-solid fa-plus-circle mr-2 text-lg"></i> 新增位置
-                        </button>
-                        <button onclick="showActionPanel('move')" class="bg-red-50 border border-red-200 text-red-700 py-3 rounded-lg font-bold text-sm hover:bg-red-100 flex justify-center items-center">
-                            <i class="fa-solid fa-arrow-right-arrow-left mr-2 text-lg"></i> 移動位置
-                        </button>
+                        <button onclick="showActionPanel('add')" class="bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-lg font-bold text-sm hover:bg-blue-100 flex justify-center items-center"><i class="fa-solid fa-plus-circle mr-2 text-lg"></i> 新增位置</button>
+                        <button onclick="showActionPanel('move')" class="bg-red-50 border border-red-200 text-red-700 py-3 rounded-lg font-bold text-sm hover:bg-red-100 flex justify-center items-center"><i class="fa-solid fa-arrow-right-arrow-left mr-2 text-lg"></i> 移動位置</button>
                     </div>
                 </div>
 
-                <!-- 狀態 B: 未登錄 (直接顯示入庫面板 + 相似推薦) -->
+                <!-- 狀態 B: 未登錄 -->
                 <div id="status-new" class="hidden">
-                    <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-200 mb-3">
-                        <p class="text-yellow-800 font-bold text-sm flex items-center">
-                            <i class="fa-solid fa-triangle-exclamation mr-2"></i> 尚未登錄，設定新位置：
-                        </p>
-                    </div>
-                    <!-- 入庫面板容器 -->
+                    <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-200 mb-3"><p class="text-yellow-800 font-bold text-sm flex items-center"><i class="fa-solid fa-triangle-exclamation mr-2"></i> 尚未登錄，設定新位置：</p></div>
                     <div id="inline-action-panel"></div> 
-
-                    <!-- 相似零件推薦 (融合建議) -->
                     <div id="similar-suggestions" class="mt-4 pt-4 border-t border-gray-100 hidden">
-                        <p class="text-xs font-bold text-gray-500 mb-2 flex items-center">
-                            <i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-500"></i> 庫存中有相似零件：
-                        </p>
-                        <div id="similar-list" class="space-y-2">
-                            <!-- Similar items injected here -->
-                        </div>
+                        <p class="text-xs font-bold text-gray-500 mb-2 flex items-center"><i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-500"></i> 庫存中有相似零件：</p>
+                        <div id="similar-list" class="space-y-2"></div>
                     </div>
                 </div>
-
-                <!-- 動態操作面板容器 (for Exist mode) -->
                 <div id="dynamic-action-area" class="mt-4 hidden border-t border-gray-100 pt-4"></div>
             </div>
 
-            <!-- 操作面板模板 (隱藏) -->
+            <!-- 操作面板模板 -->
             <div id="action-panel-template" class="hidden">
                 <div class="flex flex-col gap-3">
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-bold text-gray-700" id="action-label">目標抽屜：</span>
                         <div class="flex items-center gap-2">
                              <button onclick="adjustDrawer(-1)" class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 flex items-center justify-center text-lg shadow-sm"><i class="fa-solid fa-minus"></i></button>
-                             
                              <input type="text" id="drawer-input" class="w-24 p-2 border-2 border-blue-500 rounded-lg text-center text-2xl font-black text-blue-700 bg-white cursor-pointer shadow-inner" readonly onclick="openKeypad('drawer-input')">
-                             
                              <button onclick="adjustDrawer(1)" class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 flex items-center justify-center text-lg shadow-sm"><i class="fa-solid fa-plus"></i></button>
                         </div>
                     </div>
-                    
                     <div class="flex items-center justify-end gap-2 mb-1">
-                        <label class="flex items-center space-x-2 cursor-pointer select-none">
-                            <input type="checkbox" id="drawer-sub" class="w-5 h-5 accent-blue-600 rounded">
-                            <span class="text-sm font-bold text-gray-500">夾層 a</span>
-                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer select-none"><input type="checkbox" id="drawer-sub" class="w-5 h-5 accent-blue-600 rounded"><span class="text-sm font-bold text-gray-500">夾層 a</span></label>
                     </div>
-
-                    <button id="confirm-btn" class="w-full py-3.5 rounded-xl font-bold text-white shadow-md transition-all active:scale-95 text-lg flex justify-center items-center">
-                        確認
-                    </button>
+                    <button id="confirm-btn" class="w-full py-3.5 rounded-xl font-bold text-white shadow-md transition-all active:scale-95 text-lg flex justify-center items-center">確認</button>
                 </div>
             </div>
-
         </div>
     </main>
+
+    <!-- NEW: Live Camera Overlay -->
+    <div id="camera-overlay" class="fixed inset-0 bg-black z-[90] hidden flex flex-col">
+        <div class="relative flex-1 bg-black overflow-hidden flex items-center justify-center">
+            <video id="camera-video" autoplay playsinline class="absolute inset-0 w-full h-full object-cover"></video>
+            <canvas id="camera-canvas" class="hidden"></canvas>
+            <button onclick="stopCamera()" class="absolute top-4 right-4 text-white w-10 h-10 flex items-center justify-center bg-black/50 rounded-full"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="h-32 bg-black flex items-center justify-center gap-12 pb-6 pt-2">
+            <!-- Fallback to file upload -->
+            <button onclick="document.getElementById('camera-input').click()" class="text-white flex flex-col items-center opacity-80 hover:opacity-100">
+                <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mb-1"><i class="fa-solid fa-image text-lg"></i></div>
+                <span class="text-[10px]">相簿</span>
+            </button>
+            
+            <!-- Shutter -->
+            <button onclick="takePhoto()" class="w-16 h-16 bg-white rounded-full border-4 border-gray-300 ring-2 ring-white active:scale-95 transition"></button>
+            
+            <!-- Spacer for visual balance -->
+            <div class="w-10"></div>
+        </div>
+    </div>
 
     <!-- Keypad Modal -->
     <div id="keypad-modal" class="fixed inset-0 z-[70] hidden flex items-end justify-center pointer-events-none">
@@ -374,25 +300,20 @@
                 <button onclick="k('1')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">1</button>
                 <button onclick="k('2')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">2</button>
                 <button onclick="k('3')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">3</button>
-                
                 <button onclick="k('4')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">4</button>
                 <button onclick="k('5')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">5</button>
                 <button onclick="k('6')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">6</button>
-                
                 <button onclick="k('7')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">7</button>
                 <button onclick="k('8')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">8</button>
                 <button onclick="k('9')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">9</button>
-                
-                <!-- Modified Delete Button to CLEAR -->
                 <button onclick="k('clr')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-lg font-bold active:border-b-0 active:translate-y-1 transition-all">清空</button>
-                
                 <button onclick="k('0')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">0</button>
                 <button onclick="k('ok')" class="bg-blue-600 border-b-4 border-blue-800 rounded-xl p-3 text-white text-xl font-bold active:border-b-0 active:translate-y-1 transition-all">OK</button>
             </div>
         </div>
     </div>
 
-    <!-- Settings Modal (Omitted for brevity, same as previous) -->
+    <!-- Settings Modal -->
     <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <h3 class="font-bold text-xl mb-4 text-gray-800">設定</h3>
@@ -411,6 +332,7 @@
         let currentResizedBlob = null;
         let currentKeypadTarget = null;
         let currentAction = 'append'; 
+        let videoStream = null; // Camera stream
         
         let geminiApiKey = localStorage.getItem('lego_gemini_key') || "";
         let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-1.5-flash";
@@ -418,132 +340,150 @@
 
         if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js'));
 
-        // --- Search & Autocomplete Logic (Dual Source) ---
+        // --- Camera Logic (New) ---
+        window.startCamera = async () => {
+            try {
+                // Constraints for back camera
+                const constraints = { video: { facingMode: { ideal: "environment" } } };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('camera-video');
+                video.srcObject = stream;
+                videoStream = stream;
+                document.getElementById('camera-overlay').classList.remove('hidden');
+                // Ensure video plays (some browsers require interaction)
+                video.play().catch(e => console.log(e));
+            } catch (err) {
+                console.error(err);
+                alert("無法啟動相機，請檢查權限或使用相簿上傳。\n" + err.message);
+                // Fallback: open file input
+                document.getElementById('camera-input').click();
+            }
+        };
+
+        window.stopCamera = () => {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            document.getElementById('camera-overlay').classList.add('hidden');
+        };
+
+        window.takePhoto = () => {
+            const video = document.getElementById('camera-video');
+            const canvas = document.getElementById('camera-canvas');
+            
+            // Set canvas to video size
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            canvas.toBlob(blob => {
+                stopCamera();
+                processBlob(blob); // Core function to handle recognition
+            }, 'image/jpeg', 0.9);
+        };
+
+        // --- Unified Processing ---
+        window.handleImage = (input) => { 
+            if (input.files[0]) handleImageFile(input.files[0]); 
+        };
+
+        window.handleImageFile = (file) => {
+            // Show preview immediately for file uploads
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('preview-img').src = e.target.result;
+                document.getElementById('preview-img').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+            processBlob(file); // File is a Blob
+        };
+
+        // The core processing function (Replaced old handleImage)
+        async function processBlob(blob) {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('result-area').classList.add('hidden');
+            document.getElementById('loading-text').innerText = "處理中...";
+
+            try {
+                // 1. Resize
+                const resizedBlob = await resizeImage(blob);
+                currentResizedBlob = resizedBlob; 
+                
+                // Show preview from blob if not already shown (e.g. from camera)
+                if(!document.getElementById('preview-img').src || document.getElementById('preview-img').classList.contains('hidden')) {
+                     const url = URL.createObjectURL(resizedBlob);
+                     document.getElementById('preview-img').src = url;
+                     document.getElementById('preview-img').classList.remove('hidden');
+                }
+
+                // 2. Brickognize
+                let result = await tryBrickognize(resizedBlob);
+                
+                // 3. Gemini Fallback
+                if (!result) {
+                    if (geminiApiKey) {
+                        document.getElementById('loading-text').innerText = "Brickognize 無結果，切換至 Gemini AI...";
+                        result = await tryGemini(resizedBlob);
+                    } else { throw new Error("Brickognize 無結果且未設定 API Key"); }
+                }
+                
+                // 4. Result
+                currentPartName = result.name;
+                currentPartImgUrl = result.img;
+                document.getElementById('part-id-input').value = result.id;
+                document.getElementById('res-source').textContent = result.source;
+                document.getElementById('res-source').className = `text-[10px] px-2 py-0.5 rounded font-bold text-white ${result.source==='Brickognize'?'bg-green-500':'bg-purple-500'}`;
+
+                checkAndDisplayDrawer(result.id);
+                document.getElementById('retry-btn').classList.remove('hidden');
+
+            } catch (e) {
+                alert(e.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+                // Don't clear input value here so user can see it
+            }
+        }
+
+        // --- Other Logic (Autocomplete, DB, UI) ---
+        // (Copying existing robust logic)
         window.handleInputSearch = (value) => {
             selectedSuggestionIndex = -1;
             const suggestionsBox = document.getElementById('search-suggestions');
             if (!value || value.length < 1) { suggestionsBox.classList.add('hidden'); return; }
-
             const terms = value.toLowerCase().split(/\s+/).filter(t => t.length > 0);
-            
-            // 1. 搜尋庫存 (Firebase)
             const inventoryMatches = window.inventoryIndex.map(item => calculateScore(item, value, terms)).filter(i => i.score > 0);
-            
-            // 2. 搜尋字典 (Catalog) - 排除已在庫存中的 ID
             const existingIds = new Set(window.inventoryIndex.map(i => i.id));
-            const catalogMatches = window.catalogIndex
-                .filter(item => !existingIds.has(item.id)) // 避免重複
-                .map(item => calculateScore({...item, type: 'catalog'}, value, terms))
-                .filter(i => i.score > 0);
-
-            // 合併並排序
+            const catalogMatches = window.catalogIndex.filter(item => !existingIds.has(item.id)).map(item => calculateScore({...item, type: 'catalog'}, value, terms)).filter(i => i.score > 0);
             const allMatches = [...inventoryMatches, ...catalogMatches];
             allMatches.sort((a, b) => b.score - a.score);
             const topMatches = allMatches.slice(0, 8);
-
             if (topMatches.length > 0) {
                 suggestionsBox.innerHTML = topMatches.map((m, index) => {
                     const highlightedName = highlightText(m.name, value);
                     const highlightedId = highlightText(m.id, value);
-                    
-                    // 根據來源顯示不同標籤
-                    let badgeHtml = '';
-                    if (m.type === 'inventory') {
-                        // 夾鏈袋判斷
-                        const drawerNum = parseInt(m.drawers[0].toString().replace('a',''));
-                        const drawerLabel = drawerNum > 477 ? `📦 夾鏈袋 ${m.drawers[0]}` : `抽屜 ${m.drawers[0]}`;
-                        
-                        badgeHtml = `<span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold ml-2">${drawerLabel}</span>`;
-                    } else {
-                        badgeHtml = `<span class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-bold ml-2"><i class="fa-solid fa-book-open mr-1"></i>字典</span>`;
-                    }
-
-                    return `
-                        <div id="suggestion-${index}" class="suggestion-item flex items-center p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors" onclick="selectSuggestion('${m.id}', '${m.type}', '${m.name.replace(/'/g, "\\'")}')">
-                            ${m.img ? `<img src="${m.img}" class="w-10 h-10 object-contain mr-3 bg-gray-50 rounded border">` : '<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-300"></i></div>'}
-                            <div class="overflow-hidden flex-1">
-                                <div class="font-bold font-mono text-blue-600 flex items-center">
-                                    <span>${highlightedId}</span>
-                                    ${badgeHtml}
-                                </div>
-                                <div class="text-xs text-gray-500 truncate mt-0.5">${highlightedName}</div>
-                            </div>
-                        </div>
-                    `;
+                    let badgeHtml = m.type === 'inventory' ? `<span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold ml-2">${parseInt(m.drawers[0].toString().replace('a','')) > 477 ? `📦 夾鏈袋 ${m.drawers[0]}` : `抽屜 ${m.drawers[0]}`}</span>` : `<span class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-bold ml-2"><i class="fa-solid fa-book-open mr-1"></i>字典</span>`;
+                    return `<div id="suggestion-${index}" class="suggestion-item flex items-center p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors" onclick="selectSuggestion('${m.id}', '${m.type}', '${m.name.replace(/'/g, "\\'")}')">${m.img?`<img src="${m.img}" class="w-10 h-10 object-contain mr-3 bg-gray-50 rounded border">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-300"></i></div>'}<div class="overflow-hidden flex-1"><div class="font-bold font-mono text-blue-600 flex items-center"><span>${highlightedId}</span>${badgeHtml}</div><div class="text-xs text-gray-500 truncate mt-0.5">${highlightedName}</div></div></div>`;
                 }).join('');
                 suggestionsBox.classList.remove('hidden');
-            } else {
-                suggestionsBox.classList.add('hidden');
-            }
+            } else { suggestionsBox.classList.add('hidden'); }
         };
-
         function calculateScore(item, value, terms) {
-            let score = 0;
-            const idLower = item.id.toLowerCase();
-            if (idLower === value.toLowerCase()) score += 100;
-            else if (idLower.startsWith(value.toLowerCase())) score += 80;
-            else if (idLower.includes(value.toLowerCase())) score += 20;
-
-            let allTermsMatch = true;
-            terms.forEach(term => { if (!item.searchStr.includes(term)) allTermsMatch = false; });
-
-            if (allTermsMatch) {
-                score += 10;
-                if (item.name.toLowerCase().startsWith(terms[0])) score += 30;
-            } else {
-                if (score === 0) return { score: 0 };
-            }
+            let score = 0; const idLower = item.id.toLowerCase();
+            if (idLower === value.toLowerCase()) score += 100; else if (idLower.startsWith(value.toLowerCase())) score += 80; else if (idLower.includes(value.toLowerCase())) score += 20;
+            let allTermsMatch = true; terms.forEach(term => { if (!item.searchStr.includes(term)) allTermsMatch = false; });
+            if (allTermsMatch) { score += 10; if (item.name.toLowerCase().startsWith(terms[0])) score += 30; } else { if (score === 0) return { score: 0 }; }
             return { ...item, score };
         }
-
-        function highlightText(text, query) {
-            if(!query) return text;
-            const terms = query.split(/\s+/).filter(t => t.length > 0);
-            let result = text;
-            terms.forEach(term => {
-                const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-                result = result.replace(regex, '<span class="bg-yellow-200 text-gray-900 font-bold">$1</span>');
-            });
-            return result;
-        }
-
-        window.selectSuggestion = (id, type, name) => {
-            document.getElementById('part-id-input').value = id;
-            document.getElementById('search-suggestions').classList.add('hidden');
-            
-            // 如果選的是字典檔，我們預先填入名稱，方便使用者入庫
-            if(type === 'catalog') {
-                currentPartName = name;
-                document.getElementById('res-source').textContent = "CATALOG";
-                document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold";
-            }
-            
-            manualSearch();
-        };
-
-        window.handleSearchKeydown = (e) => {
-            const box = document.getElementById('search-suggestions');
-            if (box.classList.contains('hidden')) return;
-            const items = box.querySelectorAll('.suggestion-item');
-            if (items.length === 0) return;
-            if (e.key === 'ArrowDown') { e.preventDefault(); selectedSuggestionIndex++; if (selectedSuggestionIndex >= items.length) selectedSuggestionIndex = 0; updateSelectionStyle(items); items[selectedSuggestionIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'}); } 
-            else if (e.key === 'ArrowUp') { e.preventDefault(); selectedSuggestionIndex--; if (selectedSuggestionIndex < 0) selectedSuggestionIndex = items.length - 1; updateSelectionStyle(items); items[selectedSuggestionIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'}); } 
-            else if (e.key === 'Enter') { e.preventDefault(); if (selectedSuggestionIndex > -1) items[selectedSuggestionIndex].click(); else { manualSearch(); box.classList.add('hidden'); } } 
-            else if (e.key === 'Escape') { box.classList.add('hidden'); }
-        };
-
+        function highlightText(text, query) { if(!query) return text; const terms = query.split(/\s+/).filter(t => t.length > 0); let result = text; terms.forEach(term => { const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'); result = result.replace(regex, '<span class="bg-yellow-200 text-gray-900 font-bold">$1</span>'); }); return result; }
+        window.selectSuggestion = (id, type, name) => { document.getElementById('part-id-input').value = id; document.getElementById('search-suggestions').classList.add('hidden'); if(type === 'catalog') { currentPartName = name; document.getElementById('res-source').textContent = "CATALOG"; document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold"; } manualSearch(); };
+        window.handleSearchKeydown = (e) => { const box = document.getElementById('search-suggestions'); if (box.classList.contains('hidden')) return; const items = box.querySelectorAll('.suggestion-item'); if (items.length === 0) return; if (e.key === 'ArrowDown') { e.preventDefault(); selectedSuggestionIndex++; if (selectedSuggestionIndex >= items.length) selectedSuggestionIndex = 0; updateSelectionStyle(items); items[selectedSuggestionIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'}); } else if (e.key === 'ArrowUp') { e.preventDefault(); selectedSuggestionIndex--; if (selectedSuggestionIndex < 0) selectedSuggestionIndex = items.length - 1; updateSelectionStyle(items); items[selectedSuggestionIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'}); } else if (e.key === 'Enter') { e.preventDefault(); if (selectedSuggestionIndex > -1) items[selectedSuggestionIndex].click(); else { manualSearch(); box.classList.add('hidden'); } } else if (e.key === 'Escape') { box.classList.add('hidden'); } };
         function updateSelectionStyle(items) { items.forEach((item, idx) => { if (idx === selectedSuggestionIndex) item.classList.add('active'); else item.classList.remove('active'); }); }
 
-        // ... [Standard Logic from previous versions] ...
-        
-        function getNextEmptyDrawerId() {
-            const used = new Set();
-            Object.values(window.mappings || {}).forEach(d => { if(d.drawers) d.drawers.forEach(dr => used.add(dr.toString().replace('a',''))); });
-            for(let i=1; i<=9999; i++) if(!used.has(i.toString())) return i;
-            return 1;
-        }
-
-        // Similarity & Display Logic
+        function getNextEmptyDrawerId() { const used = new Set(); Object.values(window.mappings || {}).forEach(d => { if(d.drawers) d.drawers.forEach(dr => used.add(dr.toString().replace('a',''))); }); for(let i=1; i<=9999; i++) if(!used.has(i.toString())) return i; return 1; }
         function levenshtein(a,b){if(a.length===0)return b.length;if(b.length===0)return a.length;var matrix=[];for(var i=0;i<=b.length;i++)matrix[i]=[i];for(var j=0;j<=a.length;j++)matrix[0][j]=j;for(var i=1;i<=b.length;i++){for(var j=1;j<=a.length;j++){if(b.charAt(i-1)==a.charAt(j-1))matrix[i][j]=matrix[i-1][j-1];else matrix[i][j]=Math.min(matrix[i-1][j-1]+1,Math.min(matrix[i][j-1]+1,matrix[i-1][j]+1))}}return matrix[b.length][a.length]}
         function findSimilarParts(targetName){if(!targetName)return[];const candidates=[];const target=targetName.toLowerCase();Object.entries(window.mappings).forEach(([id,data])=>{if(data.name&&data.drawers.length>0){const dist=levenshtein(target,data.name.toLowerCase());candidates.push({...data,id,dist})}});candidates.sort((a,b)=>a.dist-b.dist);return candidates.slice(0,3)}
         
@@ -551,10 +491,8 @@
             currentPartId = partId;
             const partData = (window.mappings || {})[partId];
             const drawers = partData ? partData.drawers : [];
-            
             document.getElementById('res-part-id').textContent = partId;
             document.getElementById('res-part-name').textContent = currentPartName || partData?.name || "---";
-            
             const img = document.getElementById('api-img');
             const url = currentPartImgUrl || partData?.img;
             if(url) { img.src = url; img.classList.remove('hidden'); } else { img.classList.add('hidden'); }
@@ -567,11 +505,9 @@
                 document.getElementById('exist-actions').classList.remove('hidden');
                 document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-green-500 transition-all"; 
                 document.getElementById('drawer-list').innerHTML = drawers.map(d => {
-                    const dStr = d.toString();
-                    const num = parseInt(dStr.replace('a',''));
-                    const label = num > 477 ? `<i class="fa-solid fa-bag-shopping mr-1"></i>夾鏈袋 ${dStr}` : `<i class="fa-solid fa-box-open mr-1"></i>抽屜 ${dStr}`;
+                    const num = parseInt(d.toString().replace('a',''));
+                    const label = num > 477 ? `<i class="fa-solid fa-bag-shopping mr-1"></i>夾鏈袋 ${d}` : `<i class="fa-solid fa-box-open mr-1"></i>抽屜 ${d}`;
                     const bgClass = num > 477 ? "bg-purple-100 text-purple-800 border-purple-200" : "bg-green-50 text-green-800 border-green-200";
-                    
                     return `<div class="${bgClass} border px-3 py-1.5 rounded-lg font-bold shadow-sm flex items-center text-sm">${label}<button onclick="removeLoc('${d}')" class="ml-3 w-5 h-5 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm transition"><i class="fa-solid fa-xmark text-xs"></i></button></div>`;
                 }).join('');
             } else {
@@ -580,7 +516,6 @@
                 document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-yellow-400 transition-all"; 
                 setupActionPanel('add', document.getElementById('inline-action-panel'));
                 const inp = document.getElementById('drawer-input-active'); if(inp) inp.value = getNextEmptyDrawerId();
-                
                 const similarList = document.getElementById('similar-list');
                 const suggestions = findSimilarParts(currentPartName || "");
                 if (suggestions.length > 0) {
@@ -593,169 +528,23 @@
                 } else { document.getElementById('similar-suggestions').classList.add('hidden'); }
             }
         }
-
-        // --- Rest of UI Logic ---
-        window.useSuggestedDrawer = (drawerId) => {
-            const dStr = drawerId.toString();
-            const input = document.getElementById('drawer-input-active') || document.getElementById('drawer-input'); 
-            const checkbox = input.parentElement.parentElement.querySelector('input[type="checkbox"]');
-            if(input) input.value = dStr.replace('a','');
-            if(checkbox) checkbox.checked = dStr.includes('a');
-            input.scrollIntoView({behavior: 'smooth', block: 'center'});
-        };
-
-        window.showActionPanel = (action) => {
-            const container = document.getElementById('dynamic-action-area');
-            container.classList.remove('hidden');
-            document.getElementById('exist-actions').classList.add('hidden'); 
-            setupActionPanel(action, container);
-            document.getElementById('drawer-input-active').value = getNextEmptyDrawerId(); 
-        };
-
-        function setupActionPanel(action, container) {
-            currentAction = action;
-            container.innerHTML = document.getElementById('action-panel-template').innerHTML; 
-            const btn = container.querySelector('#confirm-btn');
-            const label = container.querySelector('#action-label');
-            if (action === 'add') { btn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'text-white'); btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i> 確認加入'; label.textContent = "加入位置："; } 
-            else { btn.classList.add('bg-red-500', 'hover:bg-red-600', 'text-white'); btn.innerHTML = '<i class="fa-solid fa-arrow-right-arrow-left mr-2"></i> 確認移動 (覆蓋)'; label.textContent = "移動至："; }
-            const input = container.querySelector('#drawer-input');
-            input.id = 'drawer-input-active'; 
-            input.onclick = () => openKeypad('drawer-input-active');
-            container.querySelector('#confirm-btn').onclick = executeAction;
-        }
-
+        window.useSuggestedDrawer = (drawerId) => { const dStr = drawerId.toString(); const input = document.getElementById('drawer-input-active') || document.getElementById('drawer-input'); const checkbox = input.parentElement.parentElement.querySelector('input[type="checkbox"]'); if(input) input.value = dStr.replace('a',''); if(checkbox) checkbox.checked = dStr.includes('a'); input.scrollIntoView({behavior: 'smooth', block: 'center'}); };
+        window.showActionPanel = (action) => { const container = document.getElementById('dynamic-action-area'); container.classList.remove('hidden'); document.getElementById('exist-actions').classList.add('hidden'); setupActionPanel(action, container); document.getElementById('drawer-input-active').value = getNextEmptyDrawerId(); };
+        function setupActionPanel(action, container) { currentAction = action; container.innerHTML = document.getElementById('action-panel-template').innerHTML; const btn = container.querySelector('#confirm-btn'); const label = container.querySelector('#action-label'); if (action === 'add') { btn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'text-white'); btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i> 確認加入'; label.textContent = "加入位置："; } else { btn.classList.add('bg-red-500', 'hover:bg-red-600', 'text-white'); btn.innerHTML = '<i class="fa-solid fa-arrow-right-arrow-left mr-2"></i> 確認移動 (覆蓋)'; label.textContent = "移動至："; } const input = container.querySelector('#drawer-input'); input.id = 'drawer-input-active'; input.onclick = () => openKeypad('drawer-input-active'); container.querySelector('#confirm-btn').onclick = executeAction; }
         window.adjustDrawer = (delta) => { const input = document.getElementById('drawer-input-active'); if(input) { let val = parseInt(input.value)||1; val+=delta; if(val<1)val=1; if(val>9999)val=9999; input.value=val; } };
-
-        window.executeAction = async () => {
-            if(!currentPartId) return;
-            const num = document.getElementById('drawer-input-active').value;
-            const activeContainer = document.getElementById('drawer-input-active').closest('#inline-action-panel') || document.getElementById('dynamic-action-area');
-            const isSub = activeContainer.querySelector('input[type="checkbox"]').checked;
-            const targetDrawer = isSub ? `${num}a` : `${num}`;
-            const btn = activeContainer.querySelector('#confirm-btn'); 
-            const originalHtml = btn.innerHTML; const originalClass = btn.className;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true;
-
-            try {
-                if (currentAction === 'move') {
-                    if(confirm(`確定移動？\n舊位置將被移除。`)) await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'move');
-                    else { btn.innerHTML = originalHtml; btn.disabled = false; return; }
-                } else { await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'append'); }
-                
-                btn.className = "w-full py-3.5 rounded-xl font-bold text-white shadow-md bg-green-500 transition-all";
-                btn.innerHTML = '<i class="fa-solid fa-check"></i> 成功';
-                setTimeout(() => { 
-                    btn.className = originalClass; btn.innerHTML = originalHtml; btn.disabled = false;
-                    if(!document.getElementById('status-exist').classList.contains('hidden')) { document.getElementById('exist-actions').classList.remove('hidden'); document.getElementById('dynamic-action-area').classList.add('hidden'); }
-                }, 1500);
-            } catch(e) { btn.innerHTML = originalHtml; btn.disabled = false; }
-        };
-
+        window.executeAction = async () => { if(!currentPartId) return; const num = document.getElementById('drawer-input-active').value; const activeContainer = document.getElementById('drawer-input-active').closest('#inline-action-panel') || document.getElementById('dynamic-action-area'); const isSub = activeContainer.querySelector('input[type="checkbox"]').checked; const targetDrawer = isSub ? `${num}a` : `${num}`; const btn = activeContainer.querySelector('#confirm-btn'); const originalHtml = btn.innerHTML; const originalClass = btn.className; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true; try { if (currentAction === 'move') { if(confirm(`確定移動？\n舊位置將被移除。`)) await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'move'); else { btn.innerHTML = originalHtml; btn.disabled = false; return; } } else { await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'append'); } btn.className = "w-full py-3.5 rounded-xl font-bold text-white shadow-md bg-green-500 transition-all"; btn.innerHTML = '<i class="fa-solid fa-check"></i> 成功'; setTimeout(() => { btn.className = originalClass; btn.innerHTML = originalHtml; btn.disabled = false; if(!document.getElementById('status-exist').classList.contains('hidden')) { document.getElementById('exist-actions').classList.remove('hidden'); document.getElementById('dynamic-action-area').classList.add('hidden'); } }, 1500); } catch(e) { btn.innerHTML = originalHtml; btn.disabled = false; } };
         window.removeLoc = (drawerId) => { if(confirm(`確定移除？`)) window.removeMappingCloud(currentPartId, drawerId); };
-
-        window.handleImage = async (input) => {
-            if (!input.files[0]) return;
-            const file = input.files[0];
-            const reader = new FileReader();
-            reader.onload = (e) => { document.getElementById('preview-img').src = e.target.result; document.getElementById('preview-img').classList.remove('hidden'); };
-            reader.readAsDataURL(file);
-            document.getElementById('loading').classList.remove('hidden');
-            document.getElementById('result-area').classList.add('hidden'); 
-            try {
-                const blob = await resizeImage(file);
-                currentResizedBlob = blob; 
-                let result = await tryBrickognize(blob);
-                if (!result) {
-                    if (geminiApiKey) { document.getElementById('loading-text').innerText = "AI 辨識中..."; result = await tryGemini(blob); } 
-                    else { throw new Error("Brickognize 無結果且未設定 API Key"); }
-                }
-                currentPartName = result.name; currentPartImgUrl = result.img;
-                document.getElementById('part-id-input').value = result.id;
-                document.getElementById('res-source').textContent = result.source;
-                document.getElementById('res-source').className = `text-[10px] px-2 py-0.5 rounded font-bold text-white ${result.source==='Brickognize'?'bg-green-500':'bg-purple-500'}`;
-                checkAndDisplayDrawer(result.id);
-                document.getElementById('retry-btn').classList.remove('hidden');
-            } catch (e) { alert(e.message); } finally { document.getElementById('loading').classList.add('hidden'); document.getElementById('loading-text').innerText = "處理中..."; input.value = ''; }
-        };
-        
-        window.manualSearch = () => {
-            const id = document.getElementById('part-id-input').value.trim();
-            if(id) {
-                // If it was selected from catalog, currentPartName is already set. If purely manual typing, reset it.
-                if(!currentPartName) {
-                     currentPartName = ""; 
-                     currentPartImgUrl = "";
-                     document.getElementById('res-source').textContent = "MANUAL";
-                     document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold";
-                }
-                document.getElementById('search-suggestions').classList.add('hidden');
-                checkAndDisplayDrawer(id);
-            }
-        };
-
-        window.retryWithGemini = async () => {
-             if(!currentResizedBlob || !geminiApiKey) { alert("無圖片或未設定 Key"); return; }
-             document.getElementById('loading').classList.remove('hidden'); document.getElementById('loading-text').innerText = "Gemini 重試中..."; document.getElementById('result-area').classList.add('hidden');
-             try {
-                 const result = await tryGemini(currentResizedBlob);
-                 currentPartName = result.name; currentPartImgUrl = ""; 
-                 document.getElementById('part-id-input').value = result.id;
-                 document.getElementById('res-source').textContent = "Gemini (Retry)";
-                 document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-purple-600 text-white font-bold";
-                 checkAndDisplayDrawer(result.id);
-             } catch(e) { alert(e.message); } finally { document.getElementById('loading').classList.add('hidden'); }
-        };
-
+        window.manualSearch = () => { const id = document.getElementById('part-id-input').value.trim(); if(id) { if(!currentPartName) { currentPartName = ""; currentPartImgUrl = ""; document.getElementById('res-source').textContent = "MANUAL"; document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold"; } document.getElementById('search-suggestions').classList.add('hidden'); checkAndDisplayDrawer(id); } };
+        window.retryWithGemini = async () => { if(!currentResizedBlob || !geminiApiKey) { alert("無圖片或未設定 Key"); return; } document.getElementById('loading').classList.remove('hidden'); document.getElementById('loading-text').innerText = "Gemini 重試中..."; document.getElementById('result-area').classList.add('hidden'); try { const result = await tryGemini(currentResizedBlob); currentPartName = result.name; currentPartImgUrl = ""; document.getElementById('part-id-input').value = result.id; document.getElementById('res-source').textContent = "Gemini (Retry)"; document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-purple-600 text-white font-bold"; checkAndDisplayDrawer(result.id); } catch(e) { alert(e.message); } finally { document.getElementById('loading').classList.add('hidden'); } };
         function resizeImage(file) { return new Promise((resolve) => { const reader = new FileReader(); reader.onload = (event) => { const img = new Image(); img.onload = () => { const canvas = document.createElement('canvas'); let width = img.width, height = img.height; if (width > 800) { height = Math.round(height * 800 / width); width = 800; } canvas.width = width; canvas.height = height; canvas.getContext('2d').drawImage(img, 0, 0, width, height); canvas.toBlob(resolve, 'image/jpeg', 0.85); }; img.src = event.target.result; }; reader.readAsDataURL(file); }); }
         async function tryBrickognize(blob) { const fd = new FormData(); fd.append('query_image', blob); const res = await fetch('https://api.brickognize.com/predict/', {method:'POST', body:fd}); if(res.ok) { const data = await res.json(); if(data.items?.length > 0) return { id: data.items[0].id, name: data.items[0].name, img: data.items[0].img_url || data.items[0].thumbnail_url, source: 'Brickognize' }; } return null; }
         async function tryGemini(blob) { const b64 = await new Promise(r => { const rd = new FileReader(); rd.onloadend = () => r(rd.result.split(',')[1]); rd.readAsDataURL(blob); }); const prompt = `Identify this Lego part. Return JSON: { "id": "PART_ID", "name": "Part Name" }. IMPORTANT: ALWAYS Append common Traditional Chinese keywords for this part (e.g., "Brick 2x4 基礎磚", "Technic Beam 科技臂", "Gear 齒輪").`; const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ contents:[{parts:[{text:prompt}, {inline_data:{mime_type:"image/jpeg", data:b64}}]}], generationConfig:{responseMimeType:"application/json"} }) }); if(!res.ok) throw new Error("API Error"); const json = await res.json(); const data = JSON.parse(json.candidates[0].content.parts[0].text); return { id: data.id, name: data.name, img: "", source: 'Gemini' }; }
-
-        // --- Keypad Functions (Updated) ---
-        window.k = (key) => {
-            const inp = document.getElementById('drawer-input-active');
-            if(!inp) return;
-            if(key==='del') inp.value = inp.value.slice(0,-1);
-            else if(key==='clr') inp.value = ''; // NEW: Clear All
-            else if(key==='ok') closeKeypad();
-            else inp.value += key;
-        };
+        window.k = (key) => { const inp = document.getElementById('drawer-input-active'); if(!inp) return; if(key==='del') inp.value = inp.value.slice(0,-1); else if(key==='clr') inp.value = ''; else if(key==='ok') closeKeypad(); else inp.value += key; };
         window.openKeypad = (id) => { const modal = document.getElementById('keypad-modal'); const content = document.getElementById('keypad-content'); modal.classList.remove('hidden'); requestAnimationFrame(() => content.classList.remove('translate-y-full')); document.getElementById('main-content').classList.add('pb-keypad'); setTimeout(() => document.getElementById(id).scrollIntoView({behavior:'smooth', block:'center'}), 300); };
         window.closeKeypad = () => { const modal = document.getElementById('keypad-modal'); document.getElementById('keypad-content').classList.add('translate-y-full'); setTimeout(() => { modal.classList.add('hidden'); document.getElementById('main-content').classList.remove('pb-keypad'); }, 300); };
-        
         window.toggleSettings = () => { const m = document.getElementById('settings-modal'); m.classList.toggle('hidden'); if(!m.classList.contains('hidden')) { document.getElementById('gemini-key').value = geminiApiKey; document.getElementById('gemini-model').value = geminiModel; if(geminiApiKey) document.getElementById('key-saved-msg').classList.remove('hidden'); else document.getElementById('key-saved-msg').classList.add('hidden'); } };
         window.saveSettings = () => { geminiApiKey = document.getElementById('gemini-key').value.trim(); geminiModel = document.getElementById('gemini-model').value; localStorage.setItem('lego_gemini_key', geminiApiKey); localStorage.setItem('lego_gemini_model', geminiModel); toggleSettings(); showMessage("設定已儲存", "success"); };
         if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
     </script>
-    
-    <!-- Keypad UI -->
-    <div id="keypad-modal" class="fixed inset-0 z-[70] hidden flex items-end justify-center pointer-events-none">
-        <div class="bg-white w-full max-w-md shadow-[0_-10px_40px_rgba(0,0,0,0.2)] rounded-t-3xl p-5 pointer-events-auto transform transition-transform duration-300 translate-y-full" id="keypad-content">
-            <div class="flex justify-between items-center mb-4">
-                <span class="text-gray-400 font-bold text-sm tracking-wider uppercase">Keypad</span>
-                <button onclick="closeKeypad()" class="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200"><i class="fa-solid fa-chevron-down"></i></button>
-            </div>
-            <div class="grid grid-cols-3 gap-3">
-                <button onclick="k('1')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">1</button>
-                <button onclick="k('2')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">2</button>
-                <button onclick="k('3')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">3</button>
-                
-                <button onclick="k('4')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">4</button>
-                <button onclick="k('5')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">5</button>
-                <button onclick="k('6')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">6</button>
-                
-                <button onclick="k('7')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">7</button>
-                <button onclick="k('8')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">8</button>
-                <button onclick="k('9')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">9</button>
-                
-                <!-- Modified Delete Button to CLEAR -->
-                <button onclick="k('clr')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-lg font-bold active:border-b-0 active:translate-y-1 transition-all">清空</button>
-                
-                <button onclick="k('0')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">0</button>
-                <button onclick="k('ok')" class="bg-blue-600 border-b-4 border-blue-800 rounded-xl p-3 text-white text-xl font-bold active:border-b-0 active:translate-y-1 transition-all">OK</button>
-            </div>
-        </div>
-    </div>
-
 </body>
 </html>
