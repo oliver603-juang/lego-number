@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂高抽屜管家 (導航修正版)</title>
+    <title>樂高抽屜管家 (完美修復版)</title>
     
     <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
@@ -75,7 +75,8 @@
             {id: "24299", name: "Wedge, Plate 2 x 2 Left"}, {id: "24307", name: "Wedge, Plate 2 x 2 Right"},
             {id: "54383", name: "Wedge, Plate 3 x 6 Cut Corners"}, {id: "54384", name: "Wedge, Plate 6 x 3 Left"},
             {id: "2555", name: "Tile, Modified 1 x 1 with Clip"}, {id: "4085d", name: "Plate, Modified 1 x 1 with Clip Vertical"},
-            {id: "4081b", name: "Plate, Modified 1 x 1 with Clip Light"}, {id: "61252", name: "Plate, Modified 1 x 1 with Clip Horizontal"}
+            {id: "4081b", name: "Plate, Modified 1 x 1 with Clip Light"}, {id: "61252", name: "Plate, Modified 1 x 1 with Clip Horizontal"},
+            {id: "53451", name: "Barb / Claw / Horn - Small"} 
         ].map(i => ({...i, searchStr: `${i.id} ${i.name}`.toLowerCase()}));
 
         async function initApp() {
@@ -95,19 +96,34 @@
             onSnapshot(collRef, (snapshot) => {
                 const newMappings = {};
                 const newIndex = [];
+
                 snapshot.forEach((doc) => {
                     const data = doc.data();
                     let drawers = [];
                     if (Array.isArray(data.drawers)) drawers = data.drawers;
                     else if (data.drawer_id) drawers = [data.drawer_id];
-                    const partData = { drawers: drawers, name: data.part_name || "", img: data.img_url || "" };
+                    
+                    const partData = {
+                        drawers: drawers,
+                        name: data.part_name || "",
+                        img: data.img_url || "" 
+                    };
+
                     if (drawers.length > 0) {
                         newMappings[doc.id] = partData;
-                        newIndex.push({ id: doc.id, name: partData.name, img: partData.img, drawers: drawers, type: 'inventory', searchStr: `${doc.id} ${partData.name}`.toLowerCase() });
+                        newIndex.push({
+                            id: doc.id,
+                            name: partData.name,
+                            img: partData.img,
+                            drawers: drawers,
+                            type: 'inventory',
+                            searchStr: `${doc.id} ${partData.name}`.toLowerCase()
+                        });
                     }
                 });
                 window.mappings = newMappings;
                 window.inventoryIndex = newIndex;
+
                 if (currentPartId) checkAndDisplayDrawer(currentPartId);
             });
         }
@@ -120,20 +136,43 @@
                 const docSnap = await getDoc(docRef);
                 if (mode === 'move') { 
                     const oldData = docSnap.exists() ? docSnap.data() : {};
-                    await (docSnap.exists() ? updateDoc : setDoc)(docRef, { part_id: partId, drawers: [drawerId], part_name: partName || oldData.part_name || "", img_url: imgUrl ? imgUrl : (oldData.img_url || ""), updated_at: new Date().toISOString() });
+                    await (docSnap.exists() ? updateDoc : setDoc)(docRef, {
+                        part_id: partId,
+                        drawers: [drawerId], 
+                        part_name: partName || oldData.part_name || "",
+                        img_url: imgUrl ? imgUrl : (oldData.img_url || ""),
+                        updated_at: new Date().toISOString()
+                    });
                 } else { 
                     if (docSnap.exists()) {
-                        await updateDoc(docRef, { drawers: arrayUnion(drawerId), part_name: partName || docSnap.data().part_name, img_url: imgUrl ? imgUrl : docSnap.data().img_url, updated_at: new Date().toISOString() });
+                        await updateDoc(docRef, {
+                            drawers: arrayUnion(drawerId),
+                            part_name: partName || docSnap.data().part_name,
+                            img_url: imgUrl ? imgUrl : docSnap.data().img_url,
+                            updated_at: new Date().toISOString()
+                        });
                     } else {
-                        await setDoc(docRef, { part_id: partId, drawers: [drawerId], part_name: partName, img_url: imgUrl || "", updated_at: new Date().toISOString() });
+                        await setDoc(docRef, {
+                            part_id: partId,
+                            drawers: [drawerId],
+                            part_name: partName,
+                            img_url: imgUrl || "",
+                            updated_at: new Date().toISOString()
+                        });
                     }
                 }
-            } catch (e) { alert("儲存失敗: " + e.message); throw e; }
+            } catch (e) {
+                alert("儲存失敗: " + e.message);
+                throw e;
+            }
         };
 
         window.removeMappingCloud = async (partId, drawerIdToRemove) => {
             if (!db) return;
-            try { const docRef = doc(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings', partId); await updateDoc(docRef, { drawers: arrayRemove(drawerIdToRemove) }); } catch (e) { alert("刪除失敗"); }
+            try {
+                const docRef = doc(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings', partId);
+                await updateDoc(docRef, { drawers: arrayRemove(drawerIdToRemove) });
+            } catch (e) { alert("刪除失敗"); }
         };
 
         window.clearAllCloudData = async () => {
@@ -141,10 +180,16 @@
             const collRef = collection(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings');
             const snapshot = await getDocs(collRef);
             const batchSize = 500;
-            let batch = writeBatch(db); let count = 0;
-            for (const doc of snapshot.docs) { batch.delete(doc.ref); count++; if (count >= batchSize) { await batch.commit(); batch = writeBatch(db); count = 0; } }
+            let batch = writeBatch(db);
+            let count = 0;
+            for (const doc of snapshot.docs) {
+                batch.delete(doc.ref);
+                count++;
+                if (count >= batchSize) { await batch.commit(); batch = writeBatch(db); count = 0; }
+            }
             if (count > 0) await batch.commit();
-            alert("已清空資料庫"); toggleSettings();
+            alert("已清空資料庫");
+            toggleSettings();
         };
 
         initApp();
@@ -176,7 +221,7 @@
         
         <!-- 1. 統一搜尋區 -->
         <div class="bg-white p-6 rounded-xl shadow-lg text-center mb-6 relative z-30">
-            <!-- New: Action Click to Start Live Camera -->
+            <!-- Action Click to Start Live Camera -->
             <div class="mb-4 relative group cursor-pointer" onclick="startCamera()">
                 <div id="preview-container" class="w-full h-40 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative transition hover:border-blue-400 hover:bg-blue-50">
                     <div class="text-gray-400 flex flex-col items-center">
@@ -284,14 +329,14 @@
                         <button onclick="navDrawer(-1)" class="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 rounded shadow-sm text-gray-600 hover:text-blue-600 active:scale-95"><i class="fa-solid fa-minus"></i></button>
                         
                         <!-- Jump Input trigger -->
-                        <div class="relative mx-2 cursor-pointer group flex-1 flex justify-center" onclick="initJumpDrawer()">
+                        <div class="relative mx-2 cursor-pointer group flex-1 flex justify-center items-center gap-2" onclick="initJumpDrawer()">
                             <span class="text-xl font-black text-blue-700 select-none border-b-2 border-transparent group-hover:border-blue-300 transition block min-w-[3ch] text-center" id="drawer-modal-title">---</span>
-                            <input type="text" id="jump-drawer-input" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer pointer-events-none" readonly> 
+                            <i onclick="event.stopPropagation(); nativeJumpDrawer()" class="fa-solid fa-keyboard text-gray-300 hover:text-blue-500 text-sm p-1 rounded"></i>
                         </div>
 
                         <button onclick="navDrawer(1)" class="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 rounded shadow-sm text-gray-600 hover:text-blue-600 active:scale-95"><i class="fa-solid fa-plus"></i></button>
                     </div>
-                    <button onclick="closeDrawerModal()" class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 transition"><i class="fa-solid fa-xmark"></i></button>
+                    <button onclick="closeDrawerModal()" class="ml-4 w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 transition"><i class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
             <div id="drawer-modal-content" class="p-4 overflow-y-auto grid grid-cols-3 gap-3 bg-gray-50/50">
@@ -317,8 +362,8 @@
         </div>
     </div>
 
-    <!-- Keypad Modal (Z-Index Increased) -->
-    <div id="keypad-modal" class="fixed inset-0 z-[95] hidden flex items-end justify-center pointer-events-none">
+    <!-- Keypad Modal (Z-Index Fixed to 100) -->
+    <div id="keypad-modal" class="fixed inset-0 z-[100] hidden flex items-end justify-center pointer-events-none">
         <div class="bg-white w-full max-w-md shadow-[0_-10px_40px_rgba(0,0,0,0.2)] rounded-t-3xl p-5 pointer-events-auto transform transition-transform duration-300 translate-y-full" id="keypad-content">
             <div class="flex justify-between items-center mb-4">
                 <span class="text-gray-400 font-bold text-sm tracking-wider uppercase">Keypad</span>
@@ -337,7 +382,9 @@
                 <button onclick="k('8')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">8</button>
                 <button onclick="k('9')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">9</button>
                 
+                <!-- Modified Delete Button to CLEAR -->
                 <button onclick="k('clr')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-lg font-bold active:border-b-0 active:translate-y-1 transition-all">清空</button>
+                
                 <button onclick="k('0')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">0</button>
                 <button onclick="k('ok')" class="bg-blue-600 border-b-4 border-blue-800 rounded-xl p-3 text-white text-xl font-bold active:border-b-0 active:translate-y-1 transition-all">OK</button>
             </div>
@@ -365,47 +412,179 @@
         let currentAction = 'append'; 
         let videoStream = null; 
         let currentViewingDrawer = null; 
-        
+        let keypadInputValue = ""; 
+        let currentSuggestions = []; // New: Store suggestions for safe referencing
+
         let geminiApiKey = localStorage.getItem('lego_gemini_key') || "";
         let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-1.5-flash";
         let selectedSuggestionIndex = -1;
 
         if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js'));
 
-        // --- Search & Autocomplete Logic (Dual Source) ---
+        // --- Camera Logic ---
+        window.startCamera = async () => {
+            try {
+                const constraints = { video: { facingMode: { ideal: "environment" } } };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('camera-video');
+                video.srcObject = stream;
+                videoStream = stream;
+                document.getElementById('camera-overlay').classList.remove('hidden');
+                video.play().catch(e => console.log(e));
+            } catch (err) {
+                console.error(err);
+                alert("無法啟動相機，請檢查權限或使用相簿上傳。\n" + err.message);
+                document.getElementById('camera-input').click();
+            }
+        };
+
+        window.stopCamera = () => {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            document.getElementById('camera-overlay').classList.add('hidden');
+        };
+
+        window.takePhoto = () => {
+            const video = document.getElementById('camera-video');
+            const canvas = document.getElementById('camera-canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => { stopCamera(); processBlob(blob); }, 'image/jpeg', 0.9);
+        };
+
+        window.handleImage = (input) => { if (input.files[0]) handleImageFile(input.files[0]); };
+        window.handleImageFile = (file) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('preview-img').src = e.target.result;
+                document.getElementById('preview-img').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+            processBlob(file);
+        };
+
+        async function processBlob(blob) {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('result-area').classList.add('hidden');
+            document.getElementById('loading-text').innerText = "處理中...";
+
+            try {
+                const resizedBlob = await resizeImage(blob);
+                currentResizedBlob = resizedBlob; 
+                if(!document.getElementById('preview-img').src || document.getElementById('preview-img').classList.contains('hidden')) {
+                     const url = URL.createObjectURL(resizedBlob);
+                     document.getElementById('preview-img').src = url;
+                     document.getElementById('preview-img').classList.remove('hidden');
+                }
+                let result = await tryBrickognize(resizedBlob);
+                if (!result) {
+                    if (geminiApiKey) {
+                        document.getElementById('loading-text').innerText = "Brickognize 無結果，切換至 Gemini AI...";
+                        result = await tryGemini(resizedBlob);
+                    } else { throw new Error("Brickognize 無結果且未設定 API Key"); }
+                }
+                currentPartName = result.name;
+                currentPartImgUrl = result.img;
+                document.getElementById('part-id-input').value = result.id;
+                document.getElementById('res-source').textContent = result.source;
+                document.getElementById('res-source').className = `text-[10px] px-2 py-0.5 rounded font-bold text-white ${result.source==='Brickognize'?'bg-green-500':'bg-purple-500'}`;
+
+                checkAndDisplayDrawer(result.id);
+                document.getElementById('retry-btn').classList.remove('hidden');
+            } catch (e) { alert(e.message); } finally { document.getElementById('loading').classList.add('hidden'); }
+        }
+
+        // --- Search & Autocomplete Logic (Fix: Fuzzy & Safe Click) ---
         window.handleInputSearch = (value) => {
             selectedSuggestionIndex = -1;
             const suggestionsBox = document.getElementById('search-suggestions');
             if (!value || value.length < 1) { suggestionsBox.classList.add('hidden'); return; }
-            const terms = value.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+            
+            const cleanValue = value.replace(/[^\w\s\u4e00-\u9fa5]/g, ' ').trim();
+            const terms = cleanValue.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+            
             const inventoryMatches = window.inventoryIndex.map(item => calculateScore(item, value, terms)).filter(i => i.score > 0);
             const existingIds = new Set(window.inventoryIndex.map(i => i.id));
             const catalogMatches = window.catalogIndex.filter(item => !existingIds.has(item.id)).map(item => calculateScore({...item, type: 'catalog'}, value, terms)).filter(i => i.score > 0);
             const allMatches = [...inventoryMatches, ...catalogMatches];
             allMatches.sort((a, b) => b.score - a.score);
-            const topMatches = allMatches.slice(0, 8);
+            const topMatches = allMatches.slice(0, 12);
+            
+            window.currentSuggestions = topMatches; // Store for safe access
+
             if (topMatches.length > 0) {
                 suggestionsBox.innerHTML = topMatches.map((m, index) => {
                     const highlightedName = highlightText(m.name, value);
                     const highlightedId = highlightText(m.id, value);
                     let badgeHtml = m.type === 'inventory' ? `<span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold ml-2">${parseInt(m.drawers[0].toString().replace('a','')) > 477 ? `📦 夾鏈袋 ${m.drawers[0]}` : `抽屜 ${m.drawers[0]}`}</span>` : `<span class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-bold ml-2"><i class="fa-solid fa-book-open mr-1"></i>字典</span>`;
-                    return `<div id="suggestion-${index}" class="suggestion-item flex items-center p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors" onclick="selectSuggestion('${m.id}', '${m.type}', '${m.name.replace(/'/g, "\\'")}')">${m.img?`<img src="${m.img}" class="w-10 h-10 object-contain mr-3 bg-gray-50 rounded border">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-300"></i></div>'}<div class="overflow-hidden flex-1"><div class="font-bold font-mono text-blue-600 flex items-center"><span>${highlightedId}</span>${badgeHtml}</div><div class="text-xs text-gray-500 truncate mt-0.5">${highlightedName}</div></div></div>`;
+                    // Fix: Use index instead of passing strings to avoid quote issues
+                    return `<div id="suggestion-${index}" class="suggestion-item flex items-center p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors" onclick="selectSuggestionByIndex(${index})">${m.img?`<img src="${m.img}" class="w-10 h-10 object-contain mr-3 bg-gray-50 rounded border">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-300"></i></div>'}<div class="overflow-hidden flex-1"><div class="font-bold font-mono text-blue-600 flex items-center"><span>${highlightedId}</span>${badgeHtml}</div><div class="text-xs text-gray-500 truncate mt-0.5">${highlightedName}</div></div></div>`;
                 }).join('');
                 suggestionsBox.classList.remove('hidden');
             } else { suggestionsBox.classList.add('hidden'); }
         };
+
         function calculateScore(item, value, terms) {
-            let score = 0; const idLower = item.id.toLowerCase();
-            if (idLower === value.toLowerCase()) score += 100; else if (idLower.startsWith(value.toLowerCase())) score += 80; else if (idLower.includes(value.toLowerCase())) score += 20;
-            let allTermsMatch = true; terms.forEach(term => { if (!item.searchStr.includes(term)) allTermsMatch = false; });
-            if (allTermsMatch) { score += 10; if (item.name.toLowerCase().startsWith(terms[0])) score += 30; } else { if (score === 0) return { score: 0 }; }
+            let score = 0; 
+            const idLower = item.id.toLowerCase();
+            const rawValueLower = value.toLowerCase();
+            if (idLower === rawValueLower) score += 100;
+            else if (idLower.startsWith(rawValueLower)) score += 80;
+            else if (idLower.includes(rawValueLower)) score += 20;
+
+            // Fuzzy Match Logic
+            let matchCount = 0;
+            terms.forEach(term => {
+                if (item.searchStr.includes(term)) matchCount++;
+            });
+
+            if (matchCount > 0) {
+                score += 10;
+                score += (matchCount / terms.length) * 50; 
+                if (item.name.toLowerCase().startsWith(terms[0])) score += 30;
+            }
+
+            if (score === 0) return { score: 0 };
             return { ...item, score };
         }
-        function highlightText(text, query) { if(!query) return text; const terms = query.split(/\s+/).filter(t => t.length > 0); let result = text; terms.forEach(term => { const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'); result = result.replace(regex, '<span class="bg-yellow-200 text-gray-900 font-bold">$1</span>'); }); return result; }
-        window.selectSuggestion = (id, type, name) => { document.getElementById('part-id-input').value = id; document.getElementById('search-suggestions').classList.add('hidden'); if(type === 'catalog') { currentPartName = name; document.getElementById('res-source').textContent = "CATALOG"; document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold"; } manualSearch(); };
+
+        function highlightText(text, query) {
+            if(!query) return text;
+            const cleanQuery = query.replace(/[^\w\s\u4e00-\u9fa5]/g, ' ').trim();
+            const terms = cleanQuery.split(/\s+/).filter(t => t.length > 0);
+            let result = text;
+            terms.forEach(term => {
+                if(term.length > 0) {
+                    const regex = new RegExp(`(${term})`, 'gi');
+                    result = result.replace(regex, '<span class="bg-yellow-200 text-gray-900 font-bold">$1</span>');
+                }
+            });
+            return result;
+        }
+
+        window.selectSuggestionByIndex = (index) => {
+            const m = window.currentSuggestions[index];
+            if(m) selectSuggestion(m.id, m.type, m.name);
+        };
+
+        window.selectSuggestion = (id, type, name) => { 
+            document.getElementById('part-id-input').value = id; 
+            document.getElementById('search-suggestions').classList.add('hidden'); 
+            if(type === 'catalog') { 
+                currentPartName = name; 
+                document.getElementById('res-source').textContent = "CATALOG"; 
+                document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold"; 
+            } 
+            manualSearch(); 
+        };
+
+        // ... [Keyboard, Settings, Utils same as before] ...
         window.handleSearchKeydown = (e) => { const box = document.getElementById('search-suggestions'); if (box.classList.contains('hidden')) return; const items = box.querySelectorAll('.suggestion-item'); if (items.length === 0) return; if (e.key === 'ArrowDown') { e.preventDefault(); selectedSuggestionIndex++; if (selectedSuggestionIndex >= items.length) selectedSuggestionIndex = 0; updateSelectionStyle(items); items[selectedSuggestionIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'}); } else if (e.key === 'ArrowUp') { e.preventDefault(); selectedSuggestionIndex--; if (selectedSuggestionIndex < 0) selectedSuggestionIndex = items.length - 1; updateSelectionStyle(items); items[selectedSuggestionIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'}); } else if (e.key === 'Enter') { e.preventDefault(); if (selectedSuggestionIndex > -1) items[selectedSuggestionIndex].click(); else { manualSearch(); box.classList.add('hidden'); } } else if (e.key === 'Escape') { box.classList.add('hidden'); } };
         function updateSelectionStyle(items) { items.forEach((item, idx) => { if (idx === selectedSuggestionIndex) item.classList.add('active'); else item.classList.remove('active'); }); }
-
         function getNextEmptyDrawerId() { const used = new Set(); Object.values(window.mappings || {}).forEach(d => { if(d.drawers) d.drawers.forEach(dr => used.add(dr.toString().replace('a',''))); }); for(let i=1; i<=9999; i++) if(!used.has(i.toString())) return i; return 1; }
         function levenshtein(a,b){if(a.length===0)return b.length;if(b.length===0)return a.length;var matrix=[];for(var i=0;i<=b.length;i++)matrix[i]=[i];for(var j=0;j<=a.length;j++)matrix[0][j]=j;for(var i=1;i<=b.length;i++){for(var j=1;j<=a.length;j++){if(b.charAt(i-1)==a.charAt(j-1))matrix[i][j]=matrix[i-1][j-1];else matrix[i][j]=Math.min(matrix[i-1][j-1]+1,Math.min(matrix[i][j-1]+1,matrix[i-1][j]+1))}}return matrix[b.length][a.length]}
         function findSimilarParts(targetName){if(!targetName)return[];const candidates=[];const target=targetName.toLowerCase();Object.entries(window.mappings).forEach(([id,data])=>{if(data.name&&data.drawers.length>0){const dist=levenshtein(target,data.name.toLowerCase());candidates.push({...data,id,dist})}});candidates.sort((a,b)=>a.dist-b.dist);return candidates.slice(0,3)}
@@ -441,7 +620,6 @@
                     similarList.innerHTML = suggestions.map(s => {
                         const dNum = parseInt(s.drawers[0].toString().replace('a',''));
                         const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
-                        // UPDATED: Added click handler for drawer navigation
                         return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg shadow-sm group">
                             ${s.img?`<img src="${s.img}" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-400"></i></div>'}
                             <div class="flex-1 min-w-0" onclick="useSuggestedDrawer('${s.drawers[0]}')"> 
@@ -466,7 +644,6 @@
                     similarList.innerHTML = suggestions.map(s => {
                         const dNum = parseInt(s.drawers[0].toString().replace('a',''));
                         const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
-                        // UPDATED: Added click handler for drawer navigation
                         return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg cursor-pointer hover:bg-purple-50 transition shadow-sm group">
                             ${s.img?`<img src="${s.img}" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-400"></i></div>'}
                             <div class="flex-1 min-w-0" onclick="useSuggestedDrawer('${s.drawers[0]}')">
@@ -492,24 +669,27 @@
         async function tryBrickognize(blob) { const fd = new FormData(); fd.append('query_image', blob); const res = await fetch('https://api.brickognize.com/predict/', {method:'POST', body:fd}); if(res.ok) { const data = await res.json(); if(data.items?.length > 0) return { id: data.items[0].id, name: data.items[0].name, img: data.items[0].img_url || data.items[0].thumbnail_url, source: 'Brickognize' }; } return null; }
         async function tryGemini(blob) { const b64 = await new Promise(r => { const rd = new FileReader(); rd.onloadend = () => r(rd.result.split(',')[1]); rd.readAsDataURL(blob); }); const prompt = `Identify this Lego part. Return JSON: { "id": "PART_ID", "name": "Part Name" }. IMPORTANT: ALWAYS Append common Traditional Chinese keywords for this part (e.g., "Brick 2x4 基礎磚", "Technic Beam 科技臂", "Gear 齒輪").`; const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ contents:[{parts:[{text:prompt}, {inline_data:{mime_type:"image/jpeg", data:b64}}]}], generationConfig:{responseMimeType:"application/json"} }) }); if(!res.ok) throw new Error("API Error"); const json = await res.json(); const data = JSON.parse(json.candidates[0].content.parts[0].text); return { id: data.id, name: data.name, img: "", source: 'Gemini' }; }
         
-        // Keypad Logic (Updated for generic targets)
         window.k = (key) => { 
-            const inp = document.getElementById(currentKeypadTarget); 
+            let inp = null;
+            if(currentKeypadTarget === 'jump-drawer-input') {
+                if(key==='del') keypadInputValue = keypadInputValue.slice(0,-1); 
+                else if(key==='clr') keypadInputValue = ''; 
+                else if(key==='ok') { confirmKeypad(); return; }
+                else keypadInputValue += key;
+                const span = document.getElementById('drawer-modal-title');
+                if(span) span.innerText = keypadInputValue || "-";
+                inp = document.getElementById('jump-drawer-input');
+                if(inp) inp.value = keypadInputValue;
+                return;
+            }
+            inp = document.getElementById(currentKeypadTarget); 
             if(!inp) return; 
-            
             let newVal = inp.value;
             if(key==='del') newVal = newVal.slice(0,-1); 
             else if(key==='clr') newVal = ''; 
             else if(key==='ok') { confirmKeypad(); return; }
             else newVal += key;
-            
             inp.value = newVal;
-
-            // Visual Sync for Jump Drawer
-            if(currentKeypadTarget === 'jump-drawer-input') {
-                const span = document.getElementById('drawer-modal-title');
-                if(span) span.innerText = newVal || "-"; 
-            }
         };
 
         window.openKeypad = (id) => { 
@@ -518,9 +698,8 @@
             const content = document.getElementById('keypad-content'); 
             modal.classList.remove('hidden'); 
             requestAnimationFrame(() => content.classList.remove('translate-y-full')); 
-            document.getElementById('main-content').classList.add('pb-keypad'); 
-            // Only scroll if target is NOT in modal
             if(id !== 'jump-drawer-input') {
+                document.getElementById('main-content').classList.add('pb-keypad'); 
                 setTimeout(() => document.getElementById(id).scrollIntoView({behavior:'smooth', block:'center'}), 300); 
             }
         };
@@ -555,11 +734,17 @@
             const dStr = drawerId.toString();
             currentViewingDrawer = dStr;
 
-            // Reset jump input for next time
+            // Reset jump input state
+            keypadInputValue = dStr;
             const jumpInput = document.getElementById('jump-drawer-input');
             if(jumpInput) jumpInput.value = dStr;
-            
-            if(title) title.innerText = dStr;
+            if(title) {
+                title.innerText = dStr;
+                title.classList.remove('animate-pulse');
+            }
+
+            const num = parseInt(dStr.replace('a',''));
+            const prefix = num > 477 ? "夾鏈袋" : "抽屜";
 
             const partsInDrawer = [];
             Object.entries(window.mappings).forEach(([pid, data]) => {
@@ -590,19 +775,43 @@
         };
 
         window.initJumpDrawer = () => {
+             // Clear for fresh input
+             keypadInputValue = "";
              const input = document.getElementById('jump-drawer-input');
-             if(input) {
-                 // Clear to allow fresh typing, or select all?
-                 // Let's keep value but ensure openKeypad focuses it conceptually
-                 input.value = currentViewingDrawer; 
-                 // Update span to match just in case
-                 document.getElementById('drawer-modal-title').innerText = currentViewingDrawer;
-                 openKeypad('jump-drawer-input');
-             }
+             input.value = ""; 
+             document.getElementById('drawer-modal-title').innerText = "-"; 
+             document.getElementById('drawer-modal-title').classList.add('animate-pulse');
+             openKeypad('jump-drawer-input');
+        };
+
+        window.nativeJumpDrawer = () => {
+            const result = prompt("請輸入要跳轉的抽屜號碼:", currentViewingDrawer);
+            if(result && result.trim() !== "") {
+                openDrawerContent(result.trim());
+            }
         };
 
         window.closeDrawerModal = () => { document.getElementById('drawer-modal').classList.add('hidden'); };
-        window.selectPartFromDrawer = (partId) => { closeDrawerModal(); checkAndDisplayDrawer(partId); };
+        
+        window.selectPartFromDrawer = (partId) => { 
+    closeDrawerModal(); 
+
+    // --- 修正開始：清空暫存狀態 ---
+    // 強制清空全域的圖片和名稱變數，確保 checkAndDisplayDrawer 會讀取資料庫(partData)的內容
+    currentPartImgUrl = ""; 
+    currentPartName = ""; 
+    currentResizedBlob = null; // 順手清空圖片 blob，避免誤觸重試按鈕
+
+    // 視覺優化：將來源標籤改為 Database 或 Inventory
+    document.getElementById('res-source').textContent = "INVENTORY";
+    document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-blue-500 text-white font-bold";
+    // --- 修正結束 ---
+
+    // 延遲一點點執行，確保視覺更新
+    setTimeout(() => {
+        checkAndDisplayDrawer(partId); 
+    }, 100);
+};
     </script>
 </body>
 </html>
