@@ -192,6 +192,125 @@
             toggleSettings();
         };
 
+// ==========================================
+//   KEYPAD SYSTEM (小算盤核心模組 - 完整版)
+// ==========================================
+
+// 1. 關閉鍵盤 (這是原本遺失的關鍵函式)
+window.closeKeypad = () => {
+    const modal = document.getElementById('keypad-modal');
+    const content = document.getElementById('keypad-content');
+    
+    // 先執行滑出的動畫 (加上 translate-y-full)
+    content.classList.add('translate-y-full');
+    
+    // 移除主畫面的底部留白 (恢復原狀)
+    document.getElementById('main-content').classList.remove('pb-keypad');
+
+    // 等動畫結束後 (300ms)，再隱藏整個遮罩
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        currentKeypadTarget = null; // 清空目標狀態
+    }, 300);
+};
+
+// 2. 開啟跳轉專用鍵盤 (支援二次點擊關閉)
+window.openDrawerJumpKeypad = () => {
+    const modal = document.getElementById('keypad-modal');
+    
+    // 邏輯判斷：如果鍵盤已經打開，且目標是跳轉輸入框，則執行關閉 (Toggle效果)
+    if (!modal.classList.contains('hidden') && currentKeypadTarget === 'global-jump-input') {
+        closeKeypad();
+        return;
+    }
+
+    const inp = document.getElementById('global-jump-input');
+    inp.value = ""; // 清空舊值，準備輸入新號碼
+    openKeypad('global-jump-input');
+};
+
+// 3. 通用開啟鍵盤函式
+window.openKeypad = (id) => { 
+    currentKeypadTarget = id; 
+    const modal = document.getElementById('keypad-modal'); 
+    const content = document.getElementById('keypad-content'); 
+    
+    // A. 預覽文字同步
+    const preview = document.getElementById('keypad-preview');
+    const targetInput = document.getElementById(id);
+    if(preview && targetInput) preview.innerText = targetInput.value;
+
+    // B. 顯示視窗與動畫
+    modal.classList.remove('hidden'); 
+    // 使用 requestAnimationFrame 確保 remove class 在下一幀執行，觸發 CSS transition 動畫
+    requestAnimationFrame(() => {
+        content.classList.remove('translate-y-full');
+    });
+    
+    // C. 畫面捲動處理 (UX 優化)
+    // 如果不是隱藏的跳轉輸入框，才需要把畫面往上推，避免擋住輸入框
+    if(id !== 'global-jump-input') {
+        document.getElementById('main-content').classList.add('pb-keypad'); 
+        // 延遲一點點捲動，體驗較順暢
+        setTimeout(() => {
+            const el = document.getElementById(id);
+            if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+        }, 300); 
+    }
+};
+
+// 4. 按鍵輸入處理 (k 函式)
+window.k = (key) => { 
+    // 防呆：如果沒有目標輸入框，不執行
+    if(!currentKeypadTarget) return;
+
+    const inp = document.getElementById(currentKeypadTarget); 
+    if(!inp) return; 
+    
+    let newVal = inp.value;
+
+    // 處理特殊鍵
+    if(key === 'del') {
+        newVal = newVal.slice(0, -1); 
+    } else if(key === 'clr') {
+        newVal = ''; 
+    } else if(key === 'ok') { 
+        confirmKeypad(); 
+        return; 
+    } else {
+        // 處理數字鍵 (限制最大長度，避免無限輸入)
+        if(newVal.length < 5) {
+            newVal += key;
+        }
+    }
+    
+    // 更新輸入框與預覽
+    inp.value = newVal;
+    const preview = document.getElementById('keypad-preview');
+    if(preview) preview.innerText = newVal;
+};
+
+// 5. 確認按鍵邏輯
+window.confirmKeypad = () => {
+     const inp = document.getElementById(currentKeypadTarget);
+     
+     if(inp) {
+         let val = inp.value;
+         
+         // 邏輯 A: 首頁或抽屜內的「跳轉」功能
+         if (currentKeypadTarget === 'global-jump-input') {
+             if (val === "") val = "1"; // 防呆：空值預設為 1
+             openDrawerContent(val);
+         }
+         // 邏輯 B: 新增或移動位置時的輸入 (僅需收起鍵盤，值已在 input 中)
+         else if (currentKeypadTarget === 'drawer-input' || currentKeypadTarget === 'drawer-input-active') {
+             // 可以在這裡加入額外的驗證邏輯，目前保持原樣
+         }
+     }
+     // 按下 OK 後，統一關閉鍵盤
+     closeKeypad();
+};
+
         initApp();
     </script>
     <style>
@@ -242,63 +361,66 @@
 
             <!-- Manual Input -->
             <div class="relative">
-                <div class="flex items-center border-b-2 border-gray-200 focus-within:border-blue-500 py-2 px-2 mt-2">
-                    <i class="fa-solid fa-keyboard text-gray-400 mr-3"></i>
-                    <input type="text" id="part-id-input" class="flex-1 bg-transparent outline-none font-mono font-bold text-lg text-gray-700 placeholder-gray-300" placeholder="輸入 ID 或關鍵字..." oninput="handleInputSearch(this.value)" onkeydown="handleSearchKeydown(event)" autocomplete="off">
-                    <button id="retry-btn" onclick="retryWithGemini()" class="hidden text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full ml-2 font-bold flex items-center">
-                        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Gemini
-                    </button>
-                </div>
-                <div id="search-suggestions" class="absolute top-full left-0 right-0 bg-white shadow-xl rounded-b-xl border border-t-0 border-gray-200 max-h-72 overflow-y-auto hidden z-40"></div>
-            </div>
+    <div class="flex items-center border-b-2 border-gray-200 focus-within:border-blue-500 py-2 px-2 mt-2">
+        <i class="fa-solid fa-keyboard text-gray-400 mr-3"></i>
+        <input type="text" id="part-id-input" class="flex-1 bg-transparent outline-none font-mono font-bold text-lg text-gray-700 placeholder-gray-300" placeholder="輸入 ID 或關鍵字..." oninput="handleInputSearch(this.value)" onkeydown="handleSearchKeydown(event)" autocomplete="off">
+        
+        <button id="retry-btn" onclick="retryWithGemini()" class="hidden text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full ml-2 font-bold flex items-center">
+            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Gemini
+        </button>
+
+        <button onclick="openDrawerJumpKeypad()" class="ml-2 w-10 h-10 rounded-full bg-gray-100 text-gray-500 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition active:scale-95">
+            <i class="fa-solid fa-calculator text-lg"></i>
+        </button>
+    </div>
+    <div id="search-suggestions" class="absolute top-full left-0 right-0 bg-white shadow-xl rounded-b-xl border border-t-0 border-gray-200 max-h-72 overflow-y-auto hidden z-40"></div>
+</div>
+
+<input type="hidden" id="global-jump-input">
         </div>
 
         <!-- 2. 結果與操作區 -->
         <div id="result-area" class="hidden space-y-4">
             <!-- 資訊卡 -->
             <div class="bg-white p-4 rounded-xl shadow-lg border-l-4" id="info-card">
-                <div class="flex items-start mb-4">
-                    <img id="api-img" src="" class="w-20 h-20 object-contain bg-gray-50 rounded border border-gray-200 mr-4 hidden">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex justify-between items-start">
-                            <h2 class="text-3xl font-black font-mono text-gray-800 leading-none" id="res-part-id">---</h2>
-                            <span id="res-source" class="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 font-bold">SRC</span>
-                        </div>
-                        <p class="text-sm text-gray-500 mt-1 leading-tight break-words" id="res-part-name">---</p>
-                    </div>
-                </div>
-
-                <!-- 狀態 A: 已存在 -->
-                <div id="status-exist" class="hidden">
-                    <div class="mb-4">
-                        <p class="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Current Location</p>
-                        <div id="drawer-list" class="flex flex-wrap gap-2"></div>
-                    </div>
-                    
-                    <!-- Exist Similar Parts -->
-                    <div id="exist-similar-suggestions" class="mt-4 pt-4 border-t border-gray-100 hidden">
-                        <p class="text-xs font-bold text-gray-500 mb-2 flex items-center"><i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-500"></i> 相似零件參考：</p>
-                        <div id="exist-similar-list" class="space-y-2"></div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3 mt-4" id="exist-actions">
-                        <button onclick="showActionPanel('add')" class="bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-lg font-bold text-sm hover:bg-blue-100 flex justify-center items-center"><i class="fa-solid fa-plus-circle mr-2 text-lg"></i> 新增位置</button>
-                        <button onclick="showActionPanel('move')" class="bg-red-50 border border-red-200 text-red-700 py-3 rounded-lg font-bold text-sm hover:bg-red-100 flex justify-center items-center"><i class="fa-solid fa-arrow-right-arrow-left mr-2 text-lg"></i> 移動位置</button>
-                    </div>
-                </div>
-
-                <!-- 狀態 B: 未登錄 -->
-                <div id="status-new" class="hidden">
-                    <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-200 mb-3"><p class="text-yellow-800 font-bold text-sm flex items-center"><i class="fa-solid fa-triangle-exclamation mr-2"></i> 尚未登錄，設定新位置：</p></div>
-                    <div id="inline-action-panel"></div> 
-                    <div id="similar-suggestions" class="mt-4 pt-4 border-t border-gray-100 hidden">
-                        <p class="text-xs font-bold text-gray-500 mb-2 flex items-center"><i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-500"></i> 庫存中有相似零件：</p>
-                        <div id="similar-list" class="space-y-2"></div>
-                    </div>
-                </div>
-                <div id="dynamic-action-area" class="mt-4 hidden border-t border-gray-100 pt-4"></div>
+    <div class="flex items-start mb-4">
+        <img id="api-img" src="" class="w-20 h-20 object-contain bg-gray-50 rounded border border-gray-200 mr-4 hidden">
+        <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-start">
+                <h2 class="text-3xl font-black font-mono text-gray-800 leading-none" id="res-part-id">---</h2>
+                <span id="res-source" class="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 font-bold">SRC</span>
             </div>
+            <p class="text-sm text-gray-500 mt-1 leading-tight break-words" id="res-part-name">---</p>
+        </div>
+    </div>
 
+    <div id="status-exist" class="hidden">
+        <div class="mb-4">
+            <p class="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Current Location</p>
+            <div id="drawer-list" class="flex flex-wrap gap-2"></div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3 mt-4" id="exist-actions">
+            <button onclick="showActionPanel('add')" class="bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-lg font-bold text-sm hover:bg-blue-100 flex justify-center items-center"><i class="fa-solid fa-plus-circle mr-2 text-lg"></i> 新增位置</button>
+            <button onclick="showActionPanel('move')" class="bg-red-50 border border-red-200 text-red-700 py-3 rounded-lg font-bold text-sm hover:bg-red-100 flex justify-center items-center"><i class="fa-solid fa-arrow-right-arrow-left mr-2 text-lg"></i> 移動位置</button>
+        </div>
+    </div>
+
+    <div id="status-new" class="hidden">
+        <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-200 mb-3"><p class="text-yellow-800 font-bold text-sm flex items-center"><i class="fa-solid fa-triangle-exclamation mr-2"></i> 尚未登錄，設定新位置：</p></div>
+        <div id="inline-action-panel"></div> 
+    </div>
+
+    <div id="dynamic-action-area" class="mt-4 hidden border-t border-gray-100 pt-4"></div>
+
+    <div id="universal-suggestions" class="mt-6 pt-4 border-t-2 border-dashed border-gray-200 hidden">
+        <p class="text-xs font-bold text-gray-500 mb-3 flex items-center">
+            <i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-500"></i> 
+            相似零件與建議位置 (點擊套用)：
+        </p>
+        <div id="universal-similar-list" class="space-y-2"></div>
+    </div>
+</div>
             <!-- 操作面板模板 -->
             <div id="action-panel-template" class="hidden">
                 <div class="flex flex-col gap-3">
@@ -325,19 +447,21 @@
             <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
                 <!-- Navigation Controls -->
                 <div class="flex items-center justify-between w-full">
-                    <div class="flex items-center flex-1">
-                        <button onclick="navDrawer(-1)" class="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 rounded shadow-sm text-gray-600 hover:text-blue-600 active:scale-95"><i class="fa-solid fa-minus"></i></button>
-                        
-                        <!-- Jump Input trigger -->
-                        <div class="relative mx-2 cursor-pointer group flex-1 flex justify-center items-center gap-2" onclick="initJumpDrawer()">
-                            <span class="text-xl font-black text-blue-700 select-none border-b-2 border-transparent group-hover:border-blue-300 transition block min-w-[3ch] text-center" id="drawer-modal-title">---</span>
-                            <i onclick="event.stopPropagation(); nativeJumpDrawer()" class="fa-solid fa-keyboard text-gray-300 hover:text-blue-500 text-sm p-1 rounded"></i>
-                        </div>
+					<button onclick="navDrawer(-1)" class="w-10 h-10 flex items-center justify-center bg-white border border-gray-200 rounded-xl shadow-sm text-gray-600 hover:text-blue-600 active:scale-95 transition">
+						<i class="fa-solid fa-minus"></i>
+					</button>
+					
+					<div onclick="openDrawerJumpKeypad()" class="flex-1 flex flex-col items-center justify-center cursor-pointer group mx-2 py-1 rounded-lg hover:bg-gray-50 transition active:scale-95">
+						<span class="text-3xl font-black text-blue-600 font-mono tracking-tight group-hover:text-blue-700" id="drawer-modal-title">---</span>
+						<div class="flex items-center gap-1 text-[10px] text-gray-400 font-bold uppercase tracking-widest group-hover:text-blue-400">
+							<i class="fa-solid fa-pen"></i> 點擊跳轉
+						</div>
+					</div>
 
-                        <button onclick="navDrawer(1)" class="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 rounded shadow-sm text-gray-600 hover:text-blue-600 active:scale-95"><i class="fa-solid fa-plus"></i></button>
-                    </div>
-                    <button onclick="closeDrawerModal()" class="ml-4 w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 transition"><i class="fa-solid fa-xmark"></i></button>
-                </div>
+					<button onclick="navDrawer(1)" class="w-10 h-10 flex items-center justify-center bg-white border border-gray-200 rounded-xl shadow-sm text-gray-600 hover:text-blue-600 active:scale-95 transition">
+						<i class="fa-solid fa-plus"></i>
+					</button>
+				</div>
             </div>
             <div id="drawer-modal-content" class="p-4 overflow-y-auto grid grid-cols-3 gap-3 bg-gray-50/50">
                 <!-- Parts go here -->
@@ -362,34 +486,42 @@
         </div>
     </div>
 
-    <!-- Keypad Modal (Z-Index Fixed to 100) -->
-    <div id="keypad-modal" class="fixed inset-0 z-[100] hidden flex items-end justify-center pointer-events-none">
-        <div class="bg-white w-full max-w-md shadow-[0_-10px_40px_rgba(0,0,0,0.2)] rounded-t-3xl p-5 pointer-events-auto transform transition-transform duration-300 translate-y-full" id="keypad-content">
-            <div class="flex justify-between items-center mb-4">
-                <span class="text-gray-400 font-bold text-sm tracking-wider uppercase">Keypad</span>
-                <button onclick="closeKeypad()" class="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200"><i class="fa-solid fa-chevron-down"></i></button>
-            </div>
-            <div class="grid grid-cols-3 gap-3">
-                <button onclick="k('1')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">1</button>
-                <button onclick="k('2')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">2</button>
-                <button onclick="k('3')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">3</button>
-                
-                <button onclick="k('4')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">4</button>
-                <button onclick="k('5')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">5</button>
-                <button onclick="k('6')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">6</button>
-                
-                <button onclick="k('7')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">7</button>
-                <button onclick="k('8')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">8</button>
-                <button onclick="k('9')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">9</button>
-                
-                <!-- Modified Delete Button to CLEAR -->
-                <button onclick="k('clr')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-lg font-bold active:border-b-0 active:translate-y-1 transition-all">清空</button>
-                
-                <button onclick="k('0')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">0</button>
-                <button onclick="k('ok')" class="bg-blue-600 border-b-4 border-blue-800 rounded-xl p-3 text-white text-xl font-bold active:border-b-0 active:translate-y-1 transition-all">OK</button>
-            </div>
+<div id="keypad-modal" class="fixed inset-0 z-[100] hidden flex items-end justify-center pointer-events-none">
+    <div class="bg-white w-full max-w-md shadow-[0_-10px_40px_rgba(0,0,0,0.2)] rounded-t-3xl p-5 pointer-events-auto transform transition-transform duration-300 translate-y-full" id="keypad-content">
+        
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+            
+            <button onclick="closeKeypad()" class="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full text-gray-500 hover:bg-red-50 hover:text-red-500 transition active:scale-95">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <span id="keypad-preview" class="flex-1 text-right text-3xl font-black text-blue-600 font-mono mx-4 min-h-[40px]"></span>
+
+            <button onclick="closeKeypad()" class="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 active:scale-95">
+                <i class="fa-solid fa-chevron-down"></i>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+            <button onclick="k('1')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">1</button>
+            <button onclick="k('2')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">2</button>
+            <button onclick="k('3')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">3</button>
+            
+            <button onclick="k('4')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">4</button>
+            <button onclick="k('5')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">5</button>
+            <button onclick="k('6')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">6</button>
+            
+            <button onclick="k('7')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">7</button>
+            <button onclick="k('8')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">8</button>
+            <button onclick="k('9')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">9</button>
+            
+            <button onclick="k('clr')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-lg font-bold active:border-b-0 active:translate-y-1 transition-all">清空</button>
+            
+            <button onclick="k('0')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">0</button>
+            <button onclick="k('ok')" class="bg-blue-600 border-b-4 border-blue-800 rounded-xl p-3 text-white text-xl font-bold active:border-b-0 active:translate-y-1 transition-all">OK</button>
         </div>
     </div>
+</div>
 
     <!-- Settings Modal -->
     <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm">
@@ -587,78 +719,169 @@
         function updateSelectionStyle(items) { items.forEach((item, idx) => { if (idx === selectedSuggestionIndex) item.classList.add('active'); else item.classList.remove('active'); }); }
         function getNextEmptyDrawerId() { const used = new Set(); Object.values(window.mappings || {}).forEach(d => { if(d.drawers) d.drawers.forEach(dr => used.add(dr.toString().replace('a',''))); }); for(let i=1; i<=9999; i++) if(!used.has(i.toString())) return i; return 1; }
         function levenshtein(a,b){if(a.length===0)return b.length;if(b.length===0)return a.length;var matrix=[];for(var i=0;i<=b.length;i++)matrix[i]=[i];for(var j=0;j<=a.length;j++)matrix[0][j]=j;for(var i=1;i<=b.length;i++){for(var j=1;j<=a.length;j++){if(b.charAt(i-1)==a.charAt(j-1))matrix[i][j]=matrix[i-1][j-1];else matrix[i][j]=Math.min(matrix[i-1][j-1]+1,Math.min(matrix[i][j-1]+1,matrix[i-1][j]+1))}}return matrix[b.length][a.length]}
-        function findSimilarParts(targetName){if(!targetName)return[];const candidates=[];const target=targetName.toLowerCase();Object.entries(window.mappings).forEach(([id,data])=>{if(data.name&&data.drawers.length>0){const dist=levenshtein(target,data.name.toLowerCase());candidates.push({...data,id,dist})}});candidates.sort((a,b)=>a.dist-b.dist);return candidates.slice(0,3)}
+        // 修正後的相似零件搜尋函式
+		function findSimilarParts(targetName) {
+			if (!targetName) return [];
+			
+			const candidates = [];
+			const target = targetName.toLowerCase();
+
+			Object.entries(window.mappings).forEach(([id, data]) => {
+				// 只比對有名字且有庫存位置的零件
+				if (data.name && data.drawers.length > 0) {
+					const nameLower = data.name.toLowerCase();
+					
+					// 排除自己 (避免推薦自己)
+					if (nameLower === target) return;
+
+					const dist = levenshtein(target, nameLower);
+					
+					// 優化：計算相似度閾值 (例如名字很短時，容錯要小；名字長時，容錯可大)
+					// 這裡設定：只有當編輯距離小於名字長度的 80% 才視為相似，避免推薦完全不相干的東西
+					if (dist < Math.max(target.length, nameLower.length) * 0.8) {
+						candidates.push({ ...data, id, dist });
+					}
+				}
+			});
+
+			// 依相似度排序 (距離越小越相似)
+			candidates.sort((a, b) => a.dist - b.dist);
+
+			// [關鍵修改] 改為回傳前 7 筆 (原本是 3)
+			return candidates.slice(0, 7);
+		}
+        // 修改後的顯示函式：統一處理相似推薦
+// 修改後的顯示函式：增加「自動查找名稱」以觸發相似推薦
+function checkAndDisplayDrawer(partId) {
+    currentPartId = partId;
+    const partData = (window.mappings || {})[partId];
+    const drawers = partData ? partData.drawers : [];
+    
+    // --- [NEW] 關鍵修正：確保有名字可以用於相似搜尋 ---
+    // 優先順序：1. 目前全域暫存 > 2. 資料庫庫存 > 3. 內建目錄(Catalog)
+    let displayName = currentPartName;
+    
+    if (!displayName && partData && partData.name) {
+        displayName = partData.name;
+    }
+    
+    // 如果還是沒名字，嘗試從靜態目錄 (window.catalogIndex) 查找
+    if (!displayName && window.catalogIndex) {
+        // 使用寬鬆比對 (==) 避免字串/數字型別問題
+        const catItem = window.catalogIndex.find(c => c.id == partId);
+        if (catItem) displayName = catItem.name;
+    }
+
+    // 更新全域名稱，確保後續操作(如新增)能抓到名字
+    if (displayName) currentPartName = displayName;
+    // ------------------------------------------------
+
+    // 1. 更新基本資料 UI
+    document.getElementById('res-part-id').textContent = partId;
+    document.getElementById('res-part-name').textContent = displayName || "---"; // 使用找到的名字
+    
+    const img = document.getElementById('api-img');
+    const url = currentPartImgUrl || partData?.img;
+    if(url) { img.src = url; img.classList.remove('hidden'); } else { img.classList.add('hidden'); }
+    
+    document.getElementById('result-area').classList.remove('hidden');
+    
+    // 2. 處理狀態分支 (已存在 vs 新零件)
+    if(drawers.length > 0) {
+        // --- 狀態：已存在 ---
+        document.getElementById('status-exist').classList.remove('hidden');
+        document.getElementById('status-new').classList.add('hidden');
         
-        function checkAndDisplayDrawer(partId) {
-            currentPartId = partId;
-            const partData = (window.mappings || {})[partId];
-            const drawers = partData ? partData.drawers : [];
-            document.getElementById('res-part-id').textContent = partId;
-            document.getElementById('res-part-name').textContent = currentPartName || partData?.name || "---";
-            const img = document.getElementById('api-img');
-            const url = currentPartImgUrl || partData?.img;
-            if(url) { img.src = url; img.classList.remove('hidden'); } else { img.classList.add('hidden'); }
-            document.getElementById('result-area').classList.remove('hidden');
+        // 重置操作區
+        document.getElementById('dynamic-action-area').classList.add('hidden');
+        document.getElementById('exist-actions').classList.remove('hidden');
+        
+        // 視覺風格：綠色
+        document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-green-500 transition-all"; 
+        
+        // 顯示目前位置列表
+        document.getElementById('drawer-list').innerHTML = drawers.map(d => {
+            const num = parseInt(d.toString().replace('a',''));
+            const label = num > 477 ? `<i class="fa-solid fa-bag-shopping mr-1"></i>夾鏈袋 ${d}` : `<i class="fa-solid fa-box-open mr-1"></i>抽屜 ${d}`;
+            const bgClass = num > 477 ? "bg-purple-100 text-purple-800 border-purple-200" : "bg-green-50 text-green-800 border-green-200";
+            return `<div class="${bgClass} border px-3 py-1.5 rounded-lg font-bold shadow-sm flex items-center text-sm"><span onclick="openDrawerContent('${d.toString().replace('a','')}')" class="cursor-pointer flex items-center hover:underline">${label}</span><button onclick="removeLoc('${d}')" class="ml-3 w-5 h-5 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm transition"><i class="fa-solid fa-xmark text-xs"></i></button></div>`;
+        }).join('');
+
+    } else {
+        // --- 狀態：新零件 ---
+        document.getElementById('status-exist').classList.add('hidden');
+        document.getElementById('status-new').classList.remove('hidden');
+        
+        // 視覺風格：黃色
+        document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-yellow-400 transition-all"; 
+        
+        // 自動載入「新增」面板
+        setupActionPanel('add', document.getElementById('inline-action-panel'));
+        const inp = document.getElementById('drawer-input-active'); 
+        if(inp) inp.value = getNextEmptyDrawerId();
+    }
+
+    // 3. 統一處理相似零件推薦
+    const uniContainer = document.getElementById('universal-suggestions');
+    const uniList = document.getElementById('universal-similar-list');
+    
+    // 使用剛剛努力找到的 displayName 進行搜尋
+    const suggestions = findSimilarParts(displayName || "");
+    
+    if (suggestions.length > 0) {
+        uniList.innerHTML = suggestions.map(s => {
+            const dNum = parseInt(s.drawers[0].toString().replace('a',''));
+            const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
             
-            if(drawers.length > 0) {
-                document.getElementById('status-exist').classList.remove('hidden');
-                document.getElementById('status-new').classList.add('hidden');
-                document.getElementById('dynamic-action-area').classList.add('hidden');
-                document.getElementById('exist-actions').classList.remove('hidden');
-                document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-green-500 transition-all"; 
-                document.getElementById('drawer-list').innerHTML = drawers.map(d => {
-                    const num = parseInt(d.toString().replace('a',''));
-                    const label = num > 477 ? `<i class="fa-solid fa-bag-shopping mr-1"></i>夾鏈袋 ${d}` : `<i class="fa-solid fa-box-open mr-1"></i>抽屜 ${d}`;
-                    const bgClass = num > 477 ? "bg-purple-100 text-purple-800 border-purple-200" : "bg-green-50 text-green-800 border-green-200";
-                    return `<div class="${bgClass} border px-3 py-1.5 rounded-lg font-bold shadow-sm flex items-center text-sm"><span onclick="openDrawerContent('${d.toString().replace('a','')}')" class="cursor-pointer flex items-center hover:underline">${label}</span><button onclick="removeLoc('${d}')" class="ml-3 w-5 h-5 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm transition"><i class="fa-solid fa-xmark text-xs"></i></button></div>`;
-                }).join('');
-
-                const similarContainer = document.getElementById('exist-similar-suggestions');
-                const similarList = document.getElementById('exist-similar-list');
-                const suggestions = findSimilarParts(currentPartName || "");
-                if (suggestions.length > 0) {
-                    similarList.innerHTML = suggestions.map(s => {
-                        const dNum = parseInt(s.drawers[0].toString().replace('a',''));
-                        const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
-                        return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg shadow-sm group">
-                            ${s.img?`<img src="${s.img}" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-400"></i></div>'}
-                            <div class="flex-1 min-w-0" onclick="useSuggestedDrawer('${s.drawers[0]}')"> 
-                                <div class="text-xs font-bold text-gray-700 truncate">${s.name}</div>
-                                <div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div>
-                            </div>
-                            <span onclick="event.stopPropagation(); openDrawerContent('${s.drawers[0].toString().replace('a','')}')" class="cursor-pointer text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded transition hover:bg-purple-200 hover:underline hover:scale-105 transform">${locLabel}</span>
-                        </div>`;
-                    }).join('');
-                    similarContainer.classList.remove('hidden');
-                } else { similarContainer.classList.add('hidden'); }
-
-            } else {
-                document.getElementById('status-exist').classList.add('hidden');
-                document.getElementById('status-new').classList.remove('hidden');
-                document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-yellow-400 transition-all"; 
-                setupActionPanel('add', document.getElementById('inline-action-panel'));
-                const inp = document.getElementById('drawer-input-active'); if(inp) inp.value = getNextEmptyDrawerId();
-                const similarList = document.getElementById('similar-list');
-                const suggestions = findSimilarParts(currentPartName || "");
-                if (suggestions.length > 0) {
-                    similarList.innerHTML = suggestions.map(s => {
-                        const dNum = parseInt(s.drawers[0].toString().replace('a',''));
-                        const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
-                        return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg cursor-pointer hover:bg-purple-50 transition shadow-sm group">
-                            ${s.img?`<img src="${s.img}" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-400"></i></div>'}
-                            <div class="flex-1 min-w-0" onclick="useSuggestedDrawer('${s.drawers[0]}')">
-                                <div class="text-xs font-bold text-gray-700 truncate">${s.name}</div>
-                                <div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div>
-                            </div>
-                            <span onclick="event.stopPropagation(); openDrawerContent('${s.drawers[0].toString().replace('a','')}')" class="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded group-hover:bg-purple-200 transition hover:underline hover:scale-105 transform">${locLabel}</span>
-                        </div>`;
-                    }).join('');
-                    document.getElementById('similar-suggestions').classList.remove('hidden');
-                } else { document.getElementById('similar-suggestions').classList.add('hidden'); }
-            }
+            return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg cursor-pointer hover:bg-purple-50 transition shadow-sm group">
+                ${s.img?`<img src="${s.img}" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-400"></i></div>'}
+                <div class="flex-1 min-w-0" onclick="useSuggestedDrawer('${s.drawers[0]}')">
+                    <div class="text-xs font-bold text-gray-700 truncate">${s.name}</div>
+                    <div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div>
+                </div>
+                <span onclick="event.stopPropagation(); openDrawerContent('${s.drawers[0].toString().replace('a','')}')" class="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded group-hover:bg-purple-200 transition hover:underline hover:scale-105 transform">${locLabel}</span>
+            </div>`;
+        }).join('');
+        uniContainer.classList.remove('hidden');
+    } else {
+        uniContainer.classList.add('hidden');
+    }
+}
+        // 優化後的套用抽屜函式
+window.useSuggestedDrawer = (drawerId) => { 
+    const dStr = drawerId.toString(); 
+    
+    // 檢查是否有正在活動的輸入框
+    let input = document.getElementById('drawer-input-active');
+    
+    // [UX 優化] 如果目前沒有開啟的操作面板 (input 不存在)，自動開啟「移動位置」模式
+    if (!input) {
+        // 如果是新零件模式下的 inline panel
+        const inlineInput = document.getElementById('inline-action-panel').querySelector('#drawer-input-active');
+        if (inlineInput) {
+            input = inlineInput;
+        } else {
+            // 零件已存在，且面板未開 -> 自動開啟 "Move" 面板
+            showActionPanel('move');
+            input = document.getElementById('drawer-input-active');
         }
-        window.useSuggestedDrawer = (drawerId) => { const dStr = drawerId.toString(); const input = document.getElementById('drawer-input-active') || document.getElementById('drawer-input'); const checkbox = input.parentElement.parentElement.querySelector('input[type="checkbox"]'); if(input) input.value = dStr.replace('a',''); if(checkbox) checkbox.checked = dStr.includes('a'); input.scrollIntoView({behavior: 'smooth', block: 'center'}); };
-        window.showActionPanel = (action) => { const container = document.getElementById('dynamic-action-area'); container.classList.remove('hidden'); document.getElementById('exist-actions').classList.add('hidden'); setupActionPanel(action, container); document.getElementById('drawer-input-active').value = getNextEmptyDrawerId(); };
+    }
+
+    // 執行填入數值
+    if (input) {
+        const checkbox = input.parentElement.parentElement.querySelector('input[type="checkbox"]'); 
+        input.value = dStr.replace('a',''); 
+        if(checkbox) checkbox.checked = dStr.includes('a'); 
+        
+        // 滾動到操作區，讓使用者看到數值變了
+        input.scrollIntoView({behavior: 'smooth', block: 'center'}); 
+        
+        // 視覺回饋：讓輸入框閃爍一下
+        input.classList.add('ring-4', 'ring-purple-300');
+        setTimeout(() => input.classList.remove('ring-4', 'ring-purple-300'), 500);
+    }
+};
+		window.showActionPanel = (action) => { const container = document.getElementById('dynamic-action-area'); container.classList.remove('hidden'); document.getElementById('exist-actions').classList.add('hidden'); setupActionPanel(action, container); document.getElementById('drawer-input-active').value = getNextEmptyDrawerId(); };
         function setupActionPanel(action, container) { currentAction = action; container.innerHTML = document.getElementById('action-panel-template').innerHTML; const btn = container.querySelector('#confirm-btn'); const label = container.querySelector('#action-label'); if (action === 'add') { btn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'text-white'); btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i> 確認加入'; label.textContent = "加入位置："; } else { btn.classList.add('bg-red-500', 'hover:bg-red-600', 'text-white'); btn.innerHTML = '<i class="fa-solid fa-arrow-right-arrow-left mr-2"></i> 確認移動 (覆蓋)'; label.textContent = "移動至："; } const input = container.querySelector('#drawer-input'); input.id = 'drawer-input-active'; input.onclick = () => openKeypad('drawer-input-active'); container.querySelector('#confirm-btn').onclick = executeAction; }
         window.adjustDrawer = (delta) => { const input = document.getElementById('drawer-input-active'); if(input) { let val = parseInt(input.value)||1; val+=delta; if(val<1)val=1; if(val>9999)val=9999; input.value=val; } };
         window.executeAction = async () => { if(!currentPartId) return; const num = document.getElementById('drawer-input-active').value; const activeContainer = document.getElementById('drawer-input-active').closest('#inline-action-panel') || document.getElementById('dynamic-action-area'); const isSub = activeContainer.querySelector('input[type="checkbox"]').checked; const targetDrawer = isSub ? `${num}a` : `${num}`; const btn = activeContainer.querySelector('#confirm-btn'); const originalHtml = btn.innerHTML; const originalClass = btn.className; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true; try { if (currentAction === 'move') { if(confirm(`確定移動？\n舊位置將被移除。`)) await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'move'); else { btn.innerHTML = originalHtml; btn.disabled = false; return; } } else { await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'append'); } btn.className = "w-full py-3.5 rounded-xl font-bold text-white shadow-md bg-green-500 transition-all"; btn.innerHTML = '<i class="fa-solid fa-check"></i> 成功'; setTimeout(() => { btn.className = originalClass; btn.innerHTML = originalHtml; btn.disabled = false; if(!document.getElementById('status-exist').classList.contains('hidden')) { document.getElementById('exist-actions').classList.remove('hidden'); document.getElementById('dynamic-action-area').classList.add('hidden'); } }, 1500); } catch(e) { btn.innerHTML = originalHtml; btn.disabled = false; } };
@@ -691,35 +914,29 @@
             else newVal += key;
             inp.value = newVal;
         };
+// --- 修正後的鍵盤邏輯 (請覆蓋原本最下方的 Keypad 相關函式) ---
 
-        window.openKeypad = (id) => { 
-            currentKeypadTarget = id; 
-            const modal = document.getElementById('keypad-modal'); 
-            const content = document.getElementById('keypad-content'); 
-            modal.classList.remove('hidden'); 
-            requestAnimationFrame(() => content.classList.remove('translate-y-full')); 
-            if(id !== 'jump-drawer-input') {
-                document.getElementById('main-content').classList.add('pb-keypad'); 
-                setTimeout(() => document.getElementById(id).scrollIntoView({behavior:'smooth', block:'center'}), 300); 
-            }
-        };
-        window.closeKeypad = () => { 
-            const modal = document.getElementById('keypad-modal'); 
-            document.getElementById('keypad-content').classList.add('translate-y-full'); 
-            setTimeout(() => { modal.classList.add('hidden'); document.getElementById('main-content').classList.remove('pb-keypad'); }, 300); 
-            currentKeypadTarget = null;
-        };
-        
-        window.confirmKeypad = () => {
-             const inp = document.getElementById(currentKeypadTarget);
-             if(inp) {
-                 if(inp.value === "") inp.value = "1";
-                 if(currentKeypadTarget === 'jump-drawer-input') {
-                     openDrawerContent(inp.value);
-                 }
-             }
-             closeKeypad();
-        };
+// 2. 開啟鍵盤 (修正：防止 hidden input 觸發捲動)
+window.openKeypad = (id) => { 
+    currentKeypadTarget = id; 
+    const modal = document.getElementById('keypad-modal'); 
+    const content = document.getElementById('keypad-content'); 
+    
+    // 重置預覽文字
+    const preview = document.getElementById('keypad-preview');
+    const targetInput = document.getElementById(id);
+    if(preview && targetInput) preview.innerText = targetInput.value;
+
+    modal.classList.remove('hidden'); 
+    requestAnimationFrame(() => content.classList.remove('translate-y-full')); 
+    
+    // 關鍵修正：如果是 'global-jump-input' (隱藏欄位)，不要執行 scrollIntoView，否則畫面會亂跳
+    if(id !== 'global-jump-input') {
+        document.getElementById('main-content').classList.add('pb-keypad'); 
+        setTimeout(() => document.getElementById(id).scrollIntoView({behavior:'smooth', block:'center'}), 300); 
+    }
+};
+
 
         window.toggleSettings = () => { const m = document.getElementById('settings-modal'); m.classList.toggle('hidden'); if(!m.classList.contains('hidden')) { document.getElementById('gemini-key').value = geminiApiKey; document.getElementById('gemini-model').value = geminiModel; if(geminiApiKey) document.getElementById('key-saved-msg').classList.remove('hidden'); else document.getElementById('key-saved-msg').classList.add('hidden'); } };
         window.saveSettings = () => { geminiApiKey = document.getElementById('gemini-key').value.trim(); geminiModel = document.getElementById('gemini-model').value; localStorage.setItem('lego_gemini_key', geminiApiKey); localStorage.setItem('lego_gemini_model', geminiModel); toggleSettings(); showMessage("設定已儲存", "success"); };
@@ -774,22 +991,6 @@
             openDrawerContent(num.toString());
         };
 
-        window.initJumpDrawer = () => {
-             // Clear for fresh input
-             keypadInputValue = "";
-             const input = document.getElementById('jump-drawer-input');
-             input.value = ""; 
-             document.getElementById('drawer-modal-title').innerText = "-"; 
-             document.getElementById('drawer-modal-title').classList.add('animate-pulse');
-             openKeypad('jump-drawer-input');
-        };
-
-        window.nativeJumpDrawer = () => {
-            const result = prompt("請輸入要跳轉的抽屜號碼:", currentViewingDrawer);
-            if(result && result.trim() !== "") {
-                openDrawerContent(result.trim());
-            }
-        };
 
         window.closeDrawerModal = () => { document.getElementById('drawer-modal').classList.add('hidden'); };
         
