@@ -95,19 +95,34 @@
             onSnapshot(collRef, (snapshot) => {
                 const newMappings = {};
                 const newIndex = [];
+
                 snapshot.forEach((doc) => {
                     const data = doc.data();
                     let drawers = [];
                     if (Array.isArray(data.drawers)) drawers = data.drawers;
                     else if (data.drawer_id) drawers = [data.drawer_id];
-                    const partData = { drawers: drawers, name: data.part_name || "", img: data.img_url || "" };
+                    
+                    const partData = {
+                        drawers: drawers,
+                        name: data.part_name || "",
+                        img: data.img_url || "" 
+                    };
+
                     if (drawers.length > 0) {
                         newMappings[doc.id] = partData;
-                        newIndex.push({ id: doc.id, name: partData.name, img: partData.img, drawers: drawers, type: 'inventory', searchStr: `${doc.id} ${partData.name}`.toLowerCase() });
+                        newIndex.push({
+                            id: doc.id,
+                            name: partData.name,
+                            img: partData.img,
+                            drawers: drawers,
+                            type: 'inventory',
+                            searchStr: `${doc.id} ${partData.name}`.toLowerCase()
+                        });
                     }
                 });
                 window.mappings = newMappings;
                 window.inventoryIndex = newIndex;
+
                 if (currentPartId) checkAndDisplayDrawer(currentPartId);
             });
         }
@@ -120,20 +135,43 @@
                 const docSnap = await getDoc(docRef);
                 if (mode === 'move') { 
                     const oldData = docSnap.exists() ? docSnap.data() : {};
-                    await (docSnap.exists() ? updateDoc : setDoc)(docRef, { part_id: partId, drawers: [drawerId], part_name: partName || oldData.part_name || "", img_url: imgUrl ? imgUrl : (oldData.img_url || ""), updated_at: new Date().toISOString() });
+                    await (docSnap.exists() ? updateDoc : setDoc)(docRef, {
+                        part_id: partId,
+                        drawers: [drawerId], 
+                        part_name: partName || oldData.part_name || "",
+                        img_url: imgUrl ? imgUrl : (oldData.img_url || ""),
+                        updated_at: new Date().toISOString()
+                    });
                 } else { 
                     if (docSnap.exists()) {
-                        await updateDoc(docRef, { drawers: arrayUnion(drawerId), part_name: partName || docSnap.data().part_name, img_url: imgUrl ? imgUrl : docSnap.data().img_url, updated_at: new Date().toISOString() });
+                        await updateDoc(docRef, {
+                            drawers: arrayUnion(drawerId),
+                            part_name: partName || docSnap.data().part_name,
+                            img_url: imgUrl ? imgUrl : docSnap.data().img_url,
+                            updated_at: new Date().toISOString()
+                        });
                     } else {
-                        await setDoc(docRef, { part_id: partId, drawers: [drawerId], part_name: partName, img_url: imgUrl || "", updated_at: new Date().toISOString() });
+                        await setDoc(docRef, {
+                            part_id: partId,
+                            drawers: [drawerId],
+                            part_name: partName,
+                            img_url: imgUrl || "",
+                            updated_at: new Date().toISOString()
+                        });
                     }
                 }
-            } catch (e) { alert("儲存失敗: " + e.message); throw e; }
+            } catch (e) {
+                alert("儲存失敗: " + e.message);
+                throw e;
+            }
         };
 
         window.removeMappingCloud = async (partId, drawerIdToRemove) => {
             if (!db) return;
-            try { const docRef = doc(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings', partId); await updateDoc(docRef, { drawers: arrayRemove(drawerIdToRemove) }); } catch (e) { alert("刪除失敗"); }
+            try {
+                const docRef = doc(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings', partId);
+                await updateDoc(docRef, { drawers: arrayRemove(drawerIdToRemove) });
+            } catch (e) { alert("刪除失敗"); }
         };
 
         window.clearAllCloudData = async () => {
@@ -141,10 +179,16 @@
             const collRef = collection(db, 'artifacts', 'lego-number-app', 'public', 'data', 'lego_mappings');
             const snapshot = await getDocs(collRef);
             const batchSize = 500;
-            let batch = writeBatch(db); let count = 0;
-            for (const doc of snapshot.docs) { batch.delete(doc.ref); count++; if (count >= batchSize) { await batch.commit(); batch = writeBatch(db); count = 0; } }
+            let batch = writeBatch(db);
+            let count = 0;
+            for (const doc of snapshot.docs) {
+                batch.delete(doc.ref);
+                count++;
+                if (count >= batchSize) { await batch.commit(); batch = writeBatch(db); count = 0; }
+            }
             if (count > 0) await batch.commit();
-            alert("已清空資料庫"); toggleSettings();
+            alert("已清空資料庫");
+            toggleSettings();
         };
 
         initApp();
@@ -230,7 +274,7 @@
                         <div id="drawer-list" class="flex flex-wrap gap-2"></div>
                     </div>
                     
-                    <!-- Exist Similar Parts -->
+                    <!-- Exist Similar Parts (UPDATED Logic) -->
                     <div id="exist-similar-suggestions" class="mt-4 pt-4 border-t border-gray-100 hidden">
                         <p class="text-xs font-bold text-gray-500 mb-2 flex items-center"><i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-500"></i> 相似零件參考：</p>
                         <div id="exist-similar-list" class="space-y-2"></div>
@@ -363,84 +407,7 @@
 
         if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js'));
 
-        // --- Camera Logic ---
-        window.startCamera = async () => {
-            try {
-                const constraints = { video: { facingMode: { ideal: "environment" } } };
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                const video = document.getElementById('camera-video');
-                video.srcObject = stream;
-                videoStream = stream;
-                document.getElementById('camera-overlay').classList.remove('hidden');
-                video.play().catch(e => console.log(e));
-            } catch (err) {
-                console.error(err);
-                alert("無法啟動相機，請檢查權限或使用相簿上傳。\n" + err.message);
-                document.getElementById('camera-input').click();
-            }
-        };
-
-        window.stopCamera = () => {
-            if (videoStream) {
-                videoStream.getTracks().forEach(track => track.stop());
-                videoStream = null;
-            }
-            document.getElementById('camera-overlay').classList.add('hidden');
-        };
-
-        window.takePhoto = () => {
-            const video = document.getElementById('camera-video');
-            const canvas = document.getElementById('camera-canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            canvas.toBlob(blob => { stopCamera(); processBlob(blob); }, 'image/jpeg', 0.9);
-        };
-
-        window.handleImage = (input) => { if (input.files[0]) handleImageFile(input.files[0]); };
-        window.handleImageFile = (file) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                document.getElementById('preview-img').src = e.target.result;
-                document.getElementById('preview-img').classList.remove('hidden');
-            };
-            reader.readAsDataURL(file);
-            processBlob(file);
-        };
-
-        async function processBlob(blob) {
-            document.getElementById('loading').classList.remove('hidden');
-            document.getElementById('result-area').classList.add('hidden');
-            document.getElementById('loading-text').innerText = "處理中...";
-
-            try {
-                const resizedBlob = await resizeImage(blob);
-                currentResizedBlob = resizedBlob; 
-                if(!document.getElementById('preview-img').src || document.getElementById('preview-img').classList.contains('hidden')) {
-                     const url = URL.createObjectURL(resizedBlob);
-                     document.getElementById('preview-img').src = url;
-                     document.getElementById('preview-img').classList.remove('hidden');
-                }
-                let result = await tryBrickognize(resizedBlob);
-                if (!result) {
-                    if (geminiApiKey) {
-                        document.getElementById('loading-text').innerText = "Brickognize 無結果，切換至 Gemini AI...";
-                        result = await tryGemini(resizedBlob);
-                    } else { throw new Error("Brickognize 無結果且未設定 API Key"); }
-                }
-                currentPartName = result.name;
-                currentPartImgUrl = result.img;
-                document.getElementById('part-id-input').value = result.id;
-                document.getElementById('res-source').textContent = result.source;
-                document.getElementById('res-source').className = `text-[10px] px-2 py-0.5 rounded font-bold text-white ${result.source==='Brickognize'?'bg-green-500':'bg-purple-500'}`;
-
-                checkAndDisplayDrawer(result.id);
-                document.getElementById('retry-btn').classList.remove('hidden');
-            } catch (e) { alert(e.message); } finally { document.getElementById('loading').classList.add('hidden'); }
-        }
-
-        // --- Other Logic ---
+        // --- Search & Autocomplete Logic (Dual Source) ---
         window.handleInputSearch = (value) => {
             selectedSuggestionIndex = -1;
             const suggestionsBox = document.getElementById('search-suggestions');
@@ -499,8 +466,8 @@
                     const num = parseInt(d.toString().replace('a',''));
                     const label = num > 477 ? `<i class="fa-solid fa-bag-shopping mr-1"></i>夾鏈袋 ${d}` : `<i class="fa-solid fa-box-open mr-1"></i>抽屜 ${d}`;
                     const bgClass = num > 477 ? "bg-purple-100 text-purple-800 border-purple-200" : "bg-green-50 text-green-800 border-green-200";
-                    // UPDATED: Added onclick to open drawer content
-                    return `<div class="${bgClass} border px-3 py-1.5 rounded-lg font-bold shadow-sm flex items-center text-sm"><span onclick="openDrawerContent('${d.toString().replace('a','')}')" class="cursor-pointer flex items-center">${label}</span><button onclick="removeLoc('${d}')" class="ml-3 w-5 h-5 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm transition"><i class="fa-solid fa-xmark text-xs"></i></button></div>`;
+                    // UPDATED: Added click handler with visual feedback class
+                    return `<div class="${bgClass} border px-3 py-1.5 rounded-lg font-bold shadow-sm flex items-center text-sm"><span onclick="openDrawerContent('${d.toString().replace('a','')}')" class="cursor-pointer flex items-center hover:underline">${label}</span><button onclick="removeLoc('${d}')" class="ml-3 w-5 h-5 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm transition"><i class="fa-solid fa-xmark text-xs"></i></button></div>`;
                 }).join('');
 
                 const similarContainer = document.getElementById('exist-similar-suggestions');
@@ -510,8 +477,15 @@
                     similarList.innerHTML = suggestions.map(s => {
                         const dNum = parseInt(s.drawers[0].toString().replace('a',''));
                         const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
-                        // UPDATED: Added onclick to open drawer content
-                        return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg shadow-sm"><div class="flex-1 min-w-0"><div class="text-xs font-bold text-gray-700 truncate">${s.name}</div><div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div></div><span onclick="event.stopPropagation(); openDrawerContent('${s.drawers[0].toString().replace('a','')}')" class="cursor-pointer text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded transition hover:bg-purple-200">${locLabel}</span></div>`;
+                        // UPDATED: Added click handler for drawer navigation
+                        return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg shadow-sm group">
+                            ${s.img?`<img src="${s.img}" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-400"></i></div>'}
+                            <div class="flex-1 min-w-0" onclick="useSuggestedDrawer('${s.drawers[0]}')"> <!-- Click Name to use ID -->
+                                <div class="text-xs font-bold text-gray-700 truncate">${s.name}</div>
+                                <div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div>
+                            </div>
+                            <span onclick="event.stopPropagation(); openDrawerContent('${s.drawers[0].toString().replace('a','')}')" class="cursor-pointer text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded transition hover:bg-purple-200 hover:underline hover:scale-105 transform">${locLabel}</span>
+                        </div>`;
                     }).join('');
                     similarContainer.classList.remove('hidden');
                 } else { similarContainer.classList.add('hidden'); }
@@ -528,8 +502,15 @@
                     similarList.innerHTML = suggestions.map(s => {
                         const dNum = parseInt(s.drawers[0].toString().replace('a',''));
                         const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
-                        // UPDATED: Added onclick to open drawer content
-                        return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg cursor-pointer hover:bg-purple-50 transition shadow-sm group" onclick="useSuggestedDrawer('${s.drawers[0]}')">${s.img?`<img src="${s.img}" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-400"></i></div>'}<div class="flex-1 min-w-0"><div class="text-xs font-bold text-gray-700 truncate">${s.name}</div><div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div></div><span onclick="event.stopPropagation(); openDrawerContent('${s.drawers[0].toString().replace('a','')}')" class="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded group-hover:bg-purple-200 transition">${locLabel}</span></div>`;
+                        // UPDATED: Added click handler for drawer navigation
+                        return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg cursor-pointer hover:bg-purple-50 transition shadow-sm group">
+                            ${s.img?`<img src="${s.img}" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-400"></i></div>'}
+                            <div class="flex-1 min-w-0" onclick="useSuggestedDrawer('${s.drawers[0]}')">
+                                <div class="text-xs font-bold text-gray-700 truncate">${s.name}</div>
+                                <div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div>
+                            </div>
+                            <span onclick="event.stopPropagation(); openDrawerContent('${s.drawers[0].toString().replace('a','')}')" class="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded group-hover:bg-purple-200 transition hover:underline hover:scale-105 transform">${locLabel}</span>
+                        </div>`;
                     }).join('');
                     document.getElementById('similar-suggestions').classList.remove('hidden');
                 } else { document.getElementById('similar-suggestions').classList.add('hidden'); }
