@@ -42,7 +42,7 @@
         window.mappings = {}; 
         window.inventoryIndex = []; 
 
-        // --- 擴充版常用零件字典 (維持不變) ---
+        // --- 擴充版常用零件字典 ---
         window.catalogIndex = [
             {id: "3001", name: "Brick 2 x 4"}, {id: "3002", name: "Brick 2 x 3"}, {id: "3003", name: "Brick 2 x 2"}, 
             {id: "3004", name: "Brick 1 x 2"}, {id: "3005", name: "Brick 1 x 1"}, {id: "3008", name: "Brick 1 x 8"}, 
@@ -153,7 +153,7 @@
         body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .pb-keypad { padding-bottom: 350px; } 
+        .pb-keypad { padding-bottom: 400px !important; }
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         .suggestion-item.active { background-color: #ebf8ff; border-left: 4px solid #3b82f6; }
     </style>
@@ -229,7 +229,14 @@
                         <p class="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Current Location</p>
                         <div id="drawer-list" class="flex flex-wrap gap-2"></div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3" id="exist-actions">
+                    
+                    <!-- NEW: Similar parts for reference when part EXISTS -->
+                    <div id="exist-similar-suggestions" class="mt-4 pt-4 border-t border-gray-100 hidden">
+                        <p class="text-xs font-bold text-gray-500 mb-2 flex items-center"><i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-500"></i> 相似零件參考：</p>
+                        <div id="exist-similar-list" class="space-y-2"></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 mt-4" id="exist-actions">
                         <button onclick="showActionPanel('add')" class="bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-lg font-bold text-sm hover:bg-blue-100 flex justify-center items-center"><i class="fa-solid fa-plus-circle mr-2 text-lg"></i> 新增位置</button>
                         <button onclick="showActionPanel('move')" class="bg-red-50 border border-red-200 text-red-700 py-3 rounded-lg font-bold text-sm hover:bg-red-100 flex justify-center items-center"><i class="fa-solid fa-arrow-right-arrow-left mr-2 text-lg"></i> 移動位置</button>
                     </div>
@@ -275,16 +282,11 @@
             <button onclick="stopCamera()" class="absolute top-4 right-4 text-white w-10 h-10 flex items-center justify-center bg-black/50 rounded-full"><i class="fa-solid fa-xmark text-xl"></i></button>
         </div>
         <div class="h-32 bg-black flex items-center justify-center gap-12 pb-6 pt-2">
-            <!-- Fallback to file upload -->
             <button onclick="document.getElementById('camera-input').click()" class="text-white flex flex-col items-center opacity-80 hover:opacity-100">
                 <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mb-1"><i class="fa-solid fa-image text-lg"></i></div>
                 <span class="text-[10px]">相簿</span>
             </button>
-            
-            <!-- Shutter -->
             <button onclick="takePhoto()" class="w-16 h-16 bg-white rounded-full border-4 border-gray-300 ring-2 ring-white active:scale-95 transition"></button>
-            
-            <!-- Spacer for visual balance -->
             <div class="w-10"></div>
         </div>
     </div>
@@ -332,7 +334,7 @@
         let currentResizedBlob = null;
         let currentKeypadTarget = null;
         let currentAction = 'append'; 
-        let videoStream = null; // Camera stream
+        let videoStream = null; 
         
         let geminiApiKey = localStorage.getItem('lego_gemini_key') || "";
         let geminiModel = localStorage.getItem('lego_gemini_model') || "gemini-1.5-flash";
@@ -340,22 +342,19 @@
 
         if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js'));
 
-        // --- Camera Logic (New) ---
+        // --- Camera Logic ---
         window.startCamera = async () => {
             try {
-                // Constraints for back camera
                 const constraints = { video: { facingMode: { ideal: "environment" } } };
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 const video = document.getElementById('camera-video');
                 video.srcObject = stream;
                 videoStream = stream;
                 document.getElementById('camera-overlay').classList.remove('hidden');
-                // Ensure video plays (some browsers require interaction)
                 video.play().catch(e => console.log(e));
             } catch (err) {
                 console.error(err);
                 alert("無法啟動相機，請檢查權限或使用相簿上傳。\n" + err.message);
-                // Fallback: open file input
                 document.getElementById('camera-input').click();
             }
         };
@@ -371,66 +370,44 @@
         window.takePhoto = () => {
             const video = document.getElementById('camera-video');
             const canvas = document.getElementById('camera-canvas');
-            
-            // Set canvas to video size
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            canvas.toBlob(blob => {
-                stopCamera();
-                processBlob(blob); // Core function to handle recognition
-            }, 'image/jpeg', 0.9);
+            canvas.toBlob(blob => { stopCamera(); processBlob(blob); }, 'image/jpeg', 0.9);
         };
 
-        // --- Unified Processing ---
-        window.handleImage = (input) => { 
-            if (input.files[0]) handleImageFile(input.files[0]); 
-        };
-
+        window.handleImage = (input) => { if (input.files[0]) handleImageFile(input.files[0]); };
         window.handleImageFile = (file) => {
-            // Show preview immediately for file uploads
             const reader = new FileReader();
             reader.onload = (e) => {
                 document.getElementById('preview-img').src = e.target.result;
                 document.getElementById('preview-img').classList.remove('hidden');
             };
             reader.readAsDataURL(file);
-            processBlob(file); // File is a Blob
+            processBlob(file);
         };
 
-        // The core processing function (Replaced old handleImage)
         async function processBlob(blob) {
             document.getElementById('loading').classList.remove('hidden');
             document.getElementById('result-area').classList.add('hidden');
             document.getElementById('loading-text').innerText = "處理中...";
 
             try {
-                // 1. Resize
                 const resizedBlob = await resizeImage(blob);
                 currentResizedBlob = resizedBlob; 
-                
-                // Show preview from blob if not already shown (e.g. from camera)
                 if(!document.getElementById('preview-img').src || document.getElementById('preview-img').classList.contains('hidden')) {
                      const url = URL.createObjectURL(resizedBlob);
                      document.getElementById('preview-img').src = url;
                      document.getElementById('preview-img').classList.remove('hidden');
                 }
-
-                // 2. Brickognize
                 let result = await tryBrickognize(resizedBlob);
-                
-                // 3. Gemini Fallback
                 if (!result) {
                     if (geminiApiKey) {
                         document.getElementById('loading-text').innerText = "Brickognize 無結果，切換至 Gemini AI...";
                         result = await tryGemini(resizedBlob);
                     } else { throw new Error("Brickognize 無結果且未設定 API Key"); }
                 }
-                
-                // 4. Result
                 currentPartName = result.name;
                 currentPartImgUrl = result.img;
                 document.getElementById('part-id-input').value = result.id;
@@ -439,17 +416,10 @@
 
                 checkAndDisplayDrawer(result.id);
                 document.getElementById('retry-btn').classList.remove('hidden');
-
-            } catch (e) {
-                alert(e.message);
-            } finally {
-                document.getElementById('loading').classList.add('hidden');
-                // Don't clear input value here so user can see it
-            }
+            } catch (e) { alert(e.message); } finally { document.getElementById('loading').classList.add('hidden'); }
         }
 
-        // --- Other Logic (Autocomplete, DB, UI) ---
-        // (Copying existing robust logic)
+        // --- Other Logic ---
         window.handleInputSearch = (value) => {
             selectedSuggestionIndex = -1;
             const suggestionsBox = document.getElementById('search-suggestions');
@@ -510,12 +480,27 @@
                     const bgClass = num > 477 ? "bg-purple-100 text-purple-800 border-purple-200" : "bg-green-50 text-green-800 border-green-200";
                     return `<div class="${bgClass} border px-3 py-1.5 rounded-lg font-bold shadow-sm flex items-center text-sm">${label}<button onclick="removeLoc('${d}')" class="ml-3 w-5 h-5 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm transition"><i class="fa-solid fa-xmark text-xs"></i></button></div>`;
                 }).join('');
+
+                // NEW: Show similar parts for existing parts too
+                const similarContainer = document.getElementById('exist-similar-suggestions');
+                const similarList = document.getElementById('exist-similar-list');
+                const suggestions = findSimilarParts(currentPartName || "");
+                if (suggestions.length > 0) {
+                    similarList.innerHTML = suggestions.map(s => {
+                        const dNum = parseInt(s.drawers[0].toString().replace('a',''));
+                        const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
+                        return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg shadow-sm"><div class="flex-1 min-w-0"><div class="text-xs font-bold text-gray-700 truncate">${s.name}</div><div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div></div><span class="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded transition">${locLabel}</span></div>`;
+                    }).join('');
+                    similarContainer.classList.remove('hidden');
+                } else { similarContainer.classList.add('hidden'); }
+
             } else {
                 document.getElementById('status-exist').classList.add('hidden');
                 document.getElementById('status-new').classList.remove('hidden');
                 document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-yellow-400 transition-all"; 
                 setupActionPanel('add', document.getElementById('inline-action-panel'));
                 const inp = document.getElementById('drawer-input-active'); if(inp) inp.value = getNextEmptyDrawerId();
+                
                 const similarList = document.getElementById('similar-list');
                 const suggestions = findSimilarParts(currentPartName || "");
                 if (suggestions.length > 0) {
