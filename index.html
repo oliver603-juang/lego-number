@@ -127,12 +127,13 @@
 
                     if (drawers.length > 0) {
                         newMappings[doc.id] = partData;
+                        // Build Inventory Search Index
                         newIndex.push({
                             id: doc.id,
                             name: partData.name,
                             img: partData.img,
                             drawers: drawers,
-                            type: 'inventory',
+                            type: 'inventory', // 標記為庫存
                             searchStr: `${doc.id} ${partData.name}`.toLowerCase()
                         });
                     }
@@ -214,7 +215,8 @@
         body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .pb-keypad { padding-bottom: 350px; } 
+        /* 增加底部邊距，避免被鍵盤擋住，特別是手機上 */
+        .pb-keypad { padding-bottom: 400px !important; } 
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         .suggestion-item.active { background-color: #ebf8ff; border-left: 4px solid #3b82f6; }
     </style>
@@ -257,7 +259,7 @@
             <div class="relative">
                 <div class="flex items-center border-b-2 border-gray-200 focus-within:border-blue-500 py-2 px-2 mt-2">
                     <i class="fa-solid fa-keyboard text-gray-400 mr-3"></i>
-                    <input type="text" id="part-id-input" class="flex-1 bg-transparent outline-none font-mono font-bold text-lg text-gray-700 placeholder-gray-300" placeholder="輸入 ID 或關鍵字 (如 tile, 1x2)..." oninput="handleInputSearch(this.value)" onkeydown="handleSearchKeydown(event)" autocomplete="off">
+                    <input type="text" id="part-id-input" class="flex-1 bg-transparent outline-none font-mono font-bold text-lg text-gray-700 placeholder-gray-300" placeholder="輸入 ID 或關鍵字..." oninput="handleInputSearch(this.value)" onkeydown="handleSearchKeydown(event)" autocomplete="off">
                     <button id="retry-btn" onclick="retryWithGemini()" class="hidden text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full ml-2 font-bold flex items-center">
                         <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Gemini
                     </button>
@@ -286,12 +288,16 @@
                     </div>
                 </div>
 
-                <!-- 狀態 A: 已存在 -->
+                <!-- 狀態 A: 已存在 (顯示位置 + 操作按鈕) -->
                 <div id="status-exist" class="hidden">
                     <div class="mb-4">
                         <p class="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Current Location</p>
-                        <div id="drawer-list" class="flex flex-wrap gap-2"></div>
+                        <div id="drawer-list" class="flex flex-wrap gap-2">
+                            <!-- Tags go here -->
+                        </div>
                     </div>
+                    
+                    <!-- 按鈕群 -->
                     <div class="grid grid-cols-2 gap-3" id="exist-actions">
                         <button onclick="showActionPanel('add')" class="bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-lg font-bold text-sm hover:bg-blue-100 flex justify-center items-center">
                             <i class="fa-solid fa-plus-circle mr-2 text-lg"></i> 新增位置
@@ -302,45 +308,55 @@
                     </div>
                 </div>
 
-                <!-- 狀態 B: 未登錄 -->
+                <!-- 狀態 B: 未登錄 (直接顯示入庫面板 + 相似推薦) -->
                 <div id="status-new" class="hidden">
                     <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-200 mb-3">
                         <p class="text-yellow-800 font-bold text-sm flex items-center">
                             <i class="fa-solid fa-triangle-exclamation mr-2"></i> 尚未登錄，設定新位置：
                         </p>
                     </div>
+                    <!-- 入庫面板容器 -->
                     <div id="inline-action-panel"></div> 
-                    <!-- 相似推薦 -->
+
+                    <!-- 相似零件推薦 (融合建議) -->
                     <div id="similar-suggestions" class="mt-4 pt-4 border-t border-gray-100 hidden">
                         <p class="text-xs font-bold text-gray-500 mb-2 flex items-center">
                             <i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-500"></i> 庫存中有相似零件：
                         </p>
-                        <div id="similar-list" class="space-y-2"></div>
+                        <div id="similar-list" class="space-y-2">
+                            <!-- Similar items injected here -->
+                        </div>
                     </div>
                 </div>
 
-                <!-- 動態操作面板容器 -->
+                <!-- 動態操作面板容器 (for Exist mode) -->
                 <div id="dynamic-action-area" class="mt-4 hidden border-t border-gray-100 pt-4"></div>
             </div>
 
-            <!-- 操作面板模板 -->
+            <!-- 操作面板模板 (隱藏) -->
             <div id="action-panel-template" class="hidden">
                 <div class="flex flex-col gap-3">
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-bold text-gray-700" id="action-label">目標抽屜：</span>
                         <div class="flex items-center gap-2">
                              <button onclick="adjustDrawer(-1)" class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 flex items-center justify-center text-lg shadow-sm"><i class="fa-solid fa-minus"></i></button>
+                             
                              <input type="text" id="drawer-input" class="w-24 p-2 border-2 border-blue-500 rounded-lg text-center text-2xl font-black text-blue-700 bg-white cursor-pointer shadow-inner" readonly onclick="openKeypad('drawer-input')">
+                             
                              <button onclick="adjustDrawer(1)" class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 flex items-center justify-center text-lg shadow-sm"><i class="fa-solid fa-plus"></i></button>
                         </div>
                     </div>
+                    
                     <div class="flex items-center justify-end gap-2 mb-1">
                         <label class="flex items-center space-x-2 cursor-pointer select-none">
                             <input type="checkbox" id="drawer-sub" class="w-5 h-5 accent-blue-600 rounded">
                             <span class="text-sm font-bold text-gray-500">夾層 a</span>
                         </label>
                     </div>
-                    <button id="confirm-btn" class="w-full py-3.5 rounded-xl font-bold text-white shadow-md transition-all active:scale-95 text-lg flex justify-center items-center">確認</button>
+
+                    <button id="confirm-btn" class="w-full py-3.5 rounded-xl font-bold text-white shadow-md transition-all active:scale-95 text-lg flex justify-center items-center">
+                        確認
+                    </button>
                 </div>
             </div>
 
@@ -367,7 +383,9 @@
                 <button onclick="k('8')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">8</button>
                 <button onclick="k('9')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">9</button>
                 
-                <button onclick="k('del')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-xl font-bold active:border-b-0 active:translate-y-1 transition-all"><i class="fa-solid fa-delete-left"></i></button>
+                <!-- Modified Delete Button to CLEAR -->
+                <button onclick="k('clr')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-lg font-bold active:border-b-0 active:translate-y-1 transition-all">清空</button>
+                
                 <button onclick="k('0')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">0</button>
                 <button onclick="k('ok')" class="bg-blue-600 border-b-4 border-blue-800 rounded-xl p-3 text-white text-xl font-bold active:border-b-0 active:translate-y-1 transition-all">OK</button>
             </div>
@@ -693,9 +711,18 @@
         async function tryBrickognize(blob) { const fd = new FormData(); fd.append('query_image', blob); const res = await fetch('https://api.brickognize.com/predict/', {method:'POST', body:fd}); if(res.ok) { const data = await res.json(); if(data.items?.length > 0) return { id: data.items[0].id, name: data.items[0].name, img: data.items[0].img_url || data.items[0].thumbnail_url, source: 'Brickognize' }; } return null; }
         async function tryGemini(blob) { const b64 = await new Promise(r => { const rd = new FileReader(); rd.onloadend = () => r(rd.result.split(',')[1]); rd.readAsDataURL(blob); }); const prompt = `Identify this Lego part. Return JSON: { "id": "PART_ID", "name": "Part Name" }. IMPORTANT: ALWAYS Append common Traditional Chinese keywords for this part (e.g., "Brick 2x4 基礎磚", "Technic Beam 科技臂", "Gear 齒輪").`; const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ contents:[{parts:[{text:prompt}, {inline_data:{mime_type:"image/jpeg", data:b64}}]}], generationConfig:{responseMimeType:"application/json"} }) }); if(!res.ok) throw new Error("API Error"); const json = await res.json(); const data = JSON.parse(json.candidates[0].content.parts[0].text); return { id: data.id, name: data.name, img: "", source: 'Gemini' }; }
 
-        window.k = (key) => { const inp = document.getElementById('drawer-input-active'); if(!inp) return; if(key==='del') inp.value = inp.value.slice(0,-1); else if(key==='clr') inp.value = ''; else if(key==='ok') closeKeypad(); else inp.value += key; };
+        // --- Keypad Functions (Updated) ---
+        window.k = (key) => {
+            const inp = document.getElementById('drawer-input-active');
+            if(!inp) return;
+            if(key==='del') inp.value = inp.value.slice(0,-1);
+            else if(key==='clr') inp.value = ''; // NEW: Clear All
+            else if(key==='ok') closeKeypad();
+            else inp.value += key;
+        };
         window.openKeypad = (id) => { const modal = document.getElementById('keypad-modal'); const content = document.getElementById('keypad-content'); modal.classList.remove('hidden'); requestAnimationFrame(() => content.classList.remove('translate-y-full')); document.getElementById('main-content').classList.add('pb-keypad'); setTimeout(() => document.getElementById(id).scrollIntoView({behavior:'smooth', block:'center'}), 300); };
         window.closeKeypad = () => { const modal = document.getElementById('keypad-modal'); document.getElementById('keypad-content').classList.add('translate-y-full'); setTimeout(() => { modal.classList.add('hidden'); document.getElementById('main-content').classList.remove('pb-keypad'); }, 300); };
+        
         window.toggleSettings = () => { const m = document.getElementById('settings-modal'); m.classList.toggle('hidden'); if(!m.classList.contains('hidden')) { document.getElementById('gemini-key').value = geminiApiKey; document.getElementById('gemini-model').value = geminiModel; if(geminiApiKey) document.getElementById('key-saved-msg').classList.remove('hidden'); else document.getElementById('key-saved-msg').classList.add('hidden'); } };
         window.saveSettings = () => { geminiApiKey = document.getElementById('gemini-key').value.trim(); geminiModel = document.getElementById('gemini-model').value; localStorage.setItem('lego_gemini_key', geminiApiKey); localStorage.setItem('lego_gemini_model', geminiModel); toggleSettings(); showMessage("設定已儲存", "success"); };
         if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
@@ -721,7 +748,9 @@
                 <button onclick="k('8')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">8</button>
                 <button onclick="k('9')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">9</button>
                 
-                <button onclick="k('del')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-xl font-bold active:border-b-0 active:translate-y-1 transition-all"><i class="fa-solid fa-delete-left"></i></button>
+                <!-- Modified Delete Button to CLEAR -->
+                <button onclick="k('clr')" class="bg-red-50 border-b-4 border-red-200 rounded-xl p-3 text-red-500 text-lg font-bold active:border-b-0 active:translate-y-1 transition-all">清空</button>
+                
                 <button onclick="k('0')" class="bg-gray-50 border-b-4 border-gray-200 rounded-xl p-3 text-2xl font-bold active:border-b-0 active:translate-y-1 active:bg-blue-50 transition-all">0</button>
                 <button onclick="k('ok')" class="bg-blue-600 border-b-4 border-blue-800 rounded-xl p-3 text-white text-xl font-bold active:border-b-0 active:translate-y-1 transition-all">OK</button>
             </div>
