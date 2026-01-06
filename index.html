@@ -42,43 +42,129 @@
         window.mappings = {}; 
         window.inventoryIndex = []; 
 
-        // --- 擴充版常用零件字典 ---
+        // --- 擴充版常用零件字典 (基於 Brick Architect Top Parts) ---
+        // 包含：Bricks, Plates, Tiles, Slopes, SNOT, Technic, Minifig Accessories
+        // --- 樂高零件字典 (資料來源：Brick Architect Website Categories) ---
         window.catalogIndex = [
-            {id: "3001", name: "Brick 2 x 4"}, {id: "3002", name: "Brick 2 x 3"}, {id: "3003", name: "Brick 2 x 2"}, 
-            {id: "3004", name: "Brick 1 x 2"}, {id: "3005", name: "Brick 1 x 1"}, {id: "3008", name: "Brick 1 x 8"}, 
-            {id: "3009", name: "Brick 1 x 6"}, {id: "3010", name: "Brick 1 x 4"}, {id: "3007", name: "Brick 2 x 8"},
-            {id: "2453", name: "Brick 1 x 1 x 5"}, {id: "2454", name: "Brick 1 x 2 x 5"},
-            {id: "3020", name: "Plate 2 x 4"}, {id: "3021", name: "Plate 2 x 3"}, {id: "3022", name: "Plate 2 x 2"}, 
-            {id: "3023", name: "Plate 1 x 2"}, {id: "3024", name: "Plate 1 x 1"}, {id: "3623", name: "Plate 1 x 3"}, 
+            // ==========================================
+            // 1. BASIC (基本磚、板、平滑磚)
+            // ==========================================
+            // --- Bricks ---
+            {id: "3005", name: "Brick 1 x 1"}, {id: "3004", name: "Brick 1 x 2"}, {id: "3622", name: "Brick 1 x 3"},
+            {id: "3010", name: "Brick 1 x 4"}, {id: "3009", name: "Brick 1 x 6"}, {id: "3008", name: "Brick 1 x 8"},
+            {id: "6111", name: "Brick 1 x 10"}, {id: "6112", name: "Brick 1 x 12"}, {id: "2465", name: "Brick 1 x 16"},
+            {id: "3003", name: "Brick 2 x 2"}, {id: "3002", name: "Brick 2 x 3"}, {id: "3001", name: "Brick 2 x 4"},
+            {id: "2456", name: "Brick 2 x 6"}, {id: "3007", name: "Brick 2 x 8"}, {id: "3006", name: "Brick 2 x 10"},
+            {id: "2357", name: "Brick 2 x 2 Corner"}, {id: "76766", name: "Brick 2 x 2 Corner 45 Degrees"},
+            
+            // --- Plates ---
+            {id: "3024", name: "Plate 1 x 1"}, {id: "3023", name: "Plate 1 x 2"}, {id: "3623", name: "Plate 1 x 3"},
             {id: "3710", name: "Plate 1 x 4"}, {id: "3666", name: "Plate 1 x 6"}, {id: "3460", name: "Plate 1 x 8"},
-            {id: "3032", name: "Plate 4 x 6"}, {id: "3034", name: "Plate 2 x 8"}, {id: "3031", name: "Plate 4 x 4"},
-            {id: "3035", name: "Plate 4 x 8"}, {id: "3030", name: "Plate 4 x 10"},
-            {id: "3068b", name: "Tile 2 x 2 with Groove"}, {id: "3069b", name: "Tile 1 x 2 with Groove"}, 
-            {id: "3070b", name: "Tile 1 x 1 with Groove"}, {id: "6636", name: "Tile 1 x 6"}, {id: "2431", name: "Tile 1 x 4"},
-            {id: "4150", name: "Tile, Round 2 x 2"}, {id: "98138", name: "Tile, Round 1 x 1"}, {id: "14769", name: "Tile, Round 2 x 2 with Bottom Stud Holder"},
-            {id: "87079", name: "Tile 2 x 4"}, {id: "63864", name: "Tile 1 x 3"},
-            {id: "2412b", name: "Tile, Modified 1 x 2 Grille (Radiator)"}, 
-            {id: "3039", name: "Slope 45 2 x 2"}, {id: "3040", name: "Slope 45 2 x 1"}, {id: "3298", name: "Slope 33 3 x 2"},
-            {id: "85984", name: "Slope 30 1 x 2 x 2/3"}, {id: "54200", name: "Slope 30 1 x 1 x 2/3 (Cheese Slope)"},
-            {id: "3660", name: "Slope, Inverted 45 2 x 2"}, {id: "3665", name: "Slope, Inverted 45 2 x 1"},
-            {id: "11477", name: "Slope, Curved 2 x 1 No Studs"}, {id: "15068", name: "Slope, Curved 2 x 2 x 2/3"},
-            {id: "87087", name: "Brick, Modified 1 x 1 with Stud on 1 Side"}, {id: "4070", name: "Brick, Modified 1 x 1 with Headlight"},
-            {id: "4733", name: "Brick, Modified 1 x 1 with Studs on 4 Sides"}, {id: "2420", name: "Plate, Corner 2 x 2"}, 
-            {id: "15573", name: "Plate, Modified 1 x 2 with 1 Stud (Jumper)"}, {id: "3794b", name: "Plate, Modified 1 x 2 with 1 Stud (Jumper)"},
-            {id: "87580", name: "Plate, Modified 2 x 2 with Groove and 1 Stud in Center (Jumper)"}, {id: "11458", name: "Plate, Modified 1 x 2 with Pin Hole on Top"},
-            {id: "3700", name: "Technic, Brick 1 x 2 with Hole"}, {id: "3894", name: "Technic, Brick 1 x 6 with Holes"}, 
-            {id: "32062", name: "Technic, Axle 2 Notched"}, {id: "4519", name: "Technic, Axle 3"},
-            {id: "3705", name: "Technic, Axle 4"}, {id: "3706", name: "Technic, Axle 6"}, 
-            {id: "32523", name: "Technic, Liftarm Thick 1 x 3"}, {id: "32524", name: "Technic, Liftarm Thick 1 x 7"}, 
-            {id: "32278", name: "Technic, Liftarm Thick 1 x 15"}, {id: "2780", name: "Technic, Pin with Friction Ridges"}, 
-            {id: "3673", name: "Technic, Pin without Friction Ridges"}, {id: "43093", name: "Technic, Axle Pin with Friction Ridges"},
+            {id: "4477", name: "Plate 1 x 10"}, {id: "60479", name: "Plate 1 x 12"},
+            {id: "3022", name: "Plate 2 x 2"}, {id: "3021", name: "Plate 2 x 3"}, {id: "3020", name: "Plate 2 x 4"},
+            {id: "3795", name: "Plate 2 x 6"}, {id: "3034", name: "Plate 2 x 8"}, {id: "3832", name: "Plate 2 x 10"},
+            {id: "3029", name: "Plate 4 x 12"}, {id: "3032", name: "Plate 4 x 6"}, {id: "3031", name: "Plate 4 x 4"},
+            {id: "2420", name: "Plate 2 x 2 Corner"},
+            
+            // --- Tiles ---
+            {id: "3070b", name: "Tile 1 x 1"}, {id: "3069b", name: "Tile 1 x 2"}, {id: "63864", name: "Tile 1 x 3"},
+            {id: "2431", name: "Tile 1 x 4"}, {id: "6636", name: "Tile 1 x 6"}, {id: "4162", name: "Tile 1 x 8"},
+            {id: "3068b", name: "Tile 2 x 2"}, {id: "14719", name: "Tile 2 x 2 Corner"}, {id: "87079", name: "Tile 2 x 4"},
+            {id: "2412b", name: "Tile, Modified 1 x 2 Grille"}, 
+
+            // ==========================================
+            // 2. WALL (牆壁、門窗、面板)
+            // ==========================================
+            {id: "98283", name: "Brick, Modified 1 x 2 Masonry"}, {id: "2877", name: "Brick, Modified 1 x 2 with Grille"},
+            {id: "14716", name: "Brick 1 x 1 x 3"}, {id: "2453", name: "Brick 1 x 1 x 5"}, {id: "2454", name: "Brick 1 x 2 x 5"},
+            {id: "60592", name: "Window 1 x 2 x 2 Flat Front"}, {id: "60593", name: "Window 1 x 2 x 3 Flat Front"},
+            {id: "60594", name: "Window 1 x 4 x 3"}, {id: "62113", name: "Window 1 x 4 x 3 Paned"},
+            {id: "60596", name: "Door Frame 1 x 4 x 6"}, {id: "60616", name: "Door 1 x 4 x 6"},
+            {id: "4865b", name: "Panel 1 x 2 x 1"}, {id: "23950", name: "Panel 1 x 3 x 1"}, {id: "87552", name: "Panel 1 x 2 x 2"},
+            {id: "15207", name: "Panel 3 x 4 x 6"},
+
+            // ==========================================
+            // 3. SNOT (側向顆粒、轉接)
+            // ==========================================
+            {id: "87087", name: "Brick 1 x 1 with Stud on Side"}, {id: "4070", name: "Brick 1 x 1 Headlight"},
+            {id: "26604", name: "Brick 1 x 1 with 2 Studs Adjacent"}, {id: "4733", name: "Brick 1 x 1 with 4 Studs"},
+            {id: "22885", name: "Brick 1 x 2 x 1 2/3 with Studs on Side"},
+            {id: "99781", name: "Bracket 1 x 2 - 1 x 2"}, {id: "99780", name: "Bracket 1 x 2 - 1 x 2 Inverted"},
+            {id: "36840", name: "Bracket 1 x 1 - 1 x 1"}, {id: "36841", name: "Bracket 1 x 1 - 1 x 1 Inverted"},
+            {id: "2436", name: "Bracket 1 x 2 - 1 x 4"}, {id: "99207", name: "Bracket 1 x 2 - 2 x 2"},
+            {id: "15573", name: "Plate 1 x 2 with 1 Stud (Jumper)"}, {id: "87580", name: "Plate 2 x 2 with 1 Stud (Jumper)"},
+
+            // ==========================================
+            // 4. ANGLE (斜坡、楔形)
+            // ==========================================
+            {id: "54200", name: "Slope 30 1 x 1 x 2/3 (Cheese)"}, {id: "85984", name: "Slope 30 1 x 2 x 2/3"},
+            {id: "3040b", name: "Slope 45 2 x 1"}, {id: "3039", name: "Slope 45 2 x 2"}, {id: "3037", name: "Slope 45 2 x 4"},
+            {id: "3298", name: "Slope 33 3 x 2"}, {id: "3665", name: "Slope, Inverted 45 2 x 1"},
             {id: "24299", name: "Wedge, Plate 2 x 2 Left"}, {id: "24307", name: "Wedge, Plate 2 x 2 Right"},
             {id: "54383", name: "Wedge, Plate 3 x 6 Cut Corners"}, {id: "54384", name: "Wedge, Plate 6 x 3 Left"},
-            {id: "2555", name: "Tile, Modified 1 x 1 with Clip"}, {id: "4085d", name: "Plate, Modified 1 x 1 with Clip Vertical"},
-            {id: "4081b", name: "Plate, Modified 1 x 1 with Clip Light"}, {id: "61252", name: "Plate, Modified 1 x 1 with Clip Horizontal"},
-            {id: "53451", name: "Barb / Claw / Horn - Small"} 
-        ].map(i => ({...i, searchStr: `${i.id} ${i.name}`.toLowerCase()}));
 
+            // ==========================================
+            // 5. CURVE (圓弧、圓盤)
+            // ==========================================
+            {id: "11477", name: "Slope, Curved 2 x 1"}, {id: "15068", name: "Slope, Curved 2 x 2"},
+            {id: "61678", name: "Slope, Curved 4 x 1"}, {id: "93273", name: "Slope, Curved 4 x 1 Double"},
+            {id: "6091", name: "Brick, Modified 1 x 2 with Curved Top"},
+            {id: "4073", name: "Plate, Round 1 x 1"}, {id: "6141", name: "Plate, Round 1 x 1"},
+            {id: "3062b", name: "Brick, Round 1 x 1"}, {id: "3941", name: "Brick, Round 2 x 2"},
+            {id: "98138", name: "Tile, Round 1 x 1"}, {id: "4150", name: "Tile, Round 2 x 2"},
+            {id: "18674", name: "Tile, Round 2 x 2 with One Stud"},
+
+            // ==========================================
+            // 6. ARTICULATION (關節、活動)
+            // ==========================================
+            {id: "4081b", name: "Plate 1 x 1 with Clip Light"}, {id: "4085d", name: "Plate 1 x 1 with Clip Vertical"},
+            {id: "61252", name: "Plate 1 x 1 with Clip Horizontal"}, {id: "63868", name: "Plate 1 x 2 with Clip"},
+            {id: "60478", name: "Plate 1 x 2 with Handle"}, {id: "48336", name: "Plate 1 x 2 with Handle on Side"},
+            {id: "3937", name: "Hinge Brick 1 x 2 Base"}, {id: "3938", name: "Hinge Brick 1 x 2 Top"},
+            {id: "14704", name: "Plate, Modified 1 x 2 with Small Towball Socket"},
+            {id: "3614", name: "Plate, Round 1 x 1 with Towball"},
+
+            // ==========================================
+            // 7. MINIFIG (人偶配件)
+            // ==========================================
+            {id: "3626c", name: "Minifig Head"}, {id: "973", name: "Minifig Torso"}, {id: "970c00", name: "Minifig Hips and Legs"},
+            {id: "3901", name: "Minifig Hair Male"}, {id: "4530", name: "Minifig Hair Female"},
+            {id: "4345", name: "Container Box 2 x 2 x 2"}, {id: "4346", name: "Container Box Door"},
+            {id: "3899", name: "Minifig Cup/Mug"}, {id: "30176", name: "Plant, Bamboo Leaves"},
+
+            // ==========================================
+            // 8. VEHICLE (載具)
+            // ==========================================
+            {id: "4624", name: "Wheel 8mm D. x 6mm"}, {id: "50950", name: "Slope, Curved 3 x 1"},
+            {id: "42610", name: "Wheel 11mm D. x 8mm"}, {id: "6014", name: "Wheel 11mm D. x 12mm"},
+            {id: "18947", name: "Technic Driving Ring 3L"}, {id: "2412b", name: "Tile, Modified 1 x 2 Grille"},
+            {id: "50943", name: "Vehicle Air Scoop 2 x 2"},
+
+            // ==========================================
+            // 9. TECHNIC (科技件)
+            // ==========================================
+            // Pins & Axles
+            {id: "2780", name: "Technic Pin Friction (Black)"}, {id: "3673", name: "Technic Pin No Friction (Grey)"},
+            {id: "43093", name: "Technic Axle Pin Friction"}, {id: "3749", name: "Technic Axle Pin No Friction"},
+            {id: "3705", name: "Technic Axle 4"}, {id: "3706", name: "Technic Axle 6"}, {id: "4519", name: "Technic Axle 3"},
+            // Beams
+            {id: "3700", name: "Technic Brick 1 x 2"}, {id: "32000", name: "Technic Brick 1 x 2 with Holes"},
+            {id: "3894", name: "Technic Brick 1 x 6"},
+            {id: "32523", name: "Technic Liftarm 1 x 3 Thick"}, {id: "32524", name: "Technic Liftarm 1 x 7 Thick"},
+            {id: "32316", name: "Technic Liftarm 1 x 5 Thick"}, {id: "32063", name: "Technic Liftarm 1 x 6 Thin"},
+            {id: "32140", name: "Technic Liftarm L-Shape 2 x 4"},
+            // Gears
+            {id: "32270", name: "Technic Gear 12 Tooth Double Bevel"}, {id: "3647", name: "Technic Gear 8 Tooth"},
+            
+            // ==========================================
+            // 10. NATURE (自然)
+            // ==========================================
+            {id: "3741", name: "Plant Flower Stem"}, {id: "24866", name: "Flower 1x1"},
+            {id: "32607", name: "Plant Plate, Round 1 x 1 with 3 Leaves"},
+            {id: "2417", name: "Plant Leaves 6 x 5"},
+            {id: "53451", name: "Barb / Claw / Horn - Small"},
+
+        ].map(i => ({...i, searchStr: `${i.id} ${i.name}`.toLowerCase()}));
         async function initApp() {
             if (!auth) return;
             onAuthStateChanged(auth, (user) => {
@@ -443,10 +529,15 @@ window.confirmKeypad = () => {
 
     <!-- NEW: Drawer Content Modal -->
     <div id="drawer-modal" class="fixed inset-0 z-[80] hidden flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl flex flex-col max-h-[80vh]">
-            <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
-                <!-- Navigation Controls -->
-                <div class="flex items-center justify-between w-full">
+        <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl flex flex-col max-h-[80vh] relative">
+            
+            <div class="p-4 border-b flex flex-col bg-gray-50 rounded-t-2xl relative">
+                
+                <button onclick="closeDrawerModal()" class="absolute top-3 left-3 z-10 w-8 h-8 flex items-center justify-center bg-white border border-gray-200 rounded-full text-gray-500 shadow-sm hover:bg-red-50 hover:text-red-500 transition active:scale-95">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <div class="flex items-center justify-between w-full mt-6">
 					<button onclick="navDrawer(-1)" class="w-10 h-10 flex items-center justify-center bg-white border border-gray-200 rounded-xl shadow-sm text-gray-600 hover:text-blue-600 active:scale-95 transition">
 						<i class="fa-solid fa-minus"></i>
 					</button>
@@ -463,9 +554,9 @@ window.confirmKeypad = () => {
 					</button>
 				</div>
             </div>
+
             <div id="drawer-modal-content" class="p-4 overflow-y-auto grid grid-cols-3 gap-3 bg-gray-50/50">
-                <!-- Parts go here -->
-            </div>
+                </div>
         </div>
     </div>
 
@@ -703,16 +794,24 @@ window.confirmKeypad = () => {
             if(m) selectSuggestion(m.id, m.type, m.name);
         };
 
-        window.selectSuggestion = (id, type, name) => { 
-            document.getElementById('part-id-input').value = id; 
-            document.getElementById('search-suggestions').classList.add('hidden'); 
-            if(type === 'catalog') { 
-                currentPartName = name; 
-                document.getElementById('res-source').textContent = "CATALOG"; 
-                document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold"; 
-            } 
-            manualSearch(); 
-        };
+        // 2. [修正] 點選建議：明確告訴 manualSearch 保留我剛剛設定的名字
+window.selectSuggestion = (id, type, name) => { 
+    document.getElementById('part-id-input').value = id; 
+    document.getElementById('search-suggestions').classList.add('hidden'); 
+    
+    if (type === 'catalog') { 
+        currentPartName = name; 
+        document.getElementById('res-source').textContent = "CATALOG"; 
+        document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold"; 
+        
+        // 呼叫搜尋，並傳入 true (保留狀態)
+        manualSearch(true);
+    } else {
+        // 如果是 Inventory (庫存)，通常資料庫會有名字，不強制保留也沒關係，但為了保險也可以設 true
+        // 這裡設 false 讓 checkAndDisplayDrawer 去抓資料庫最新的比較安全
+        manualSearch(false);
+    }
+};
 
         // ... [Keyboard, Settings, Utils same as before] ...
         window.handleSearchKeydown = (e) => { const box = document.getElementById('search-suggestions'); if (box.classList.contains('hidden')) return; const items = box.querySelectorAll('.suggestion-item'); if (items.length === 0) return; if (e.key === 'ArrowDown') { e.preventDefault(); selectedSuggestionIndex++; if (selectedSuggestionIndex >= items.length) selectedSuggestionIndex = 0; updateSelectionStyle(items); items[selectedSuggestionIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'}); } else if (e.key === 'ArrowUp') { e.preventDefault(); selectedSuggestionIndex--; if (selectedSuggestionIndex < 0) selectedSuggestionIndex = items.length - 1; updateSelectionStyle(items); items[selectedSuggestionIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'}); } else if (e.key === 'Enter') { e.preventDefault(); if (selectedSuggestionIndex > -1) items[selectedSuggestionIndex].click(); else { manualSearch(); box.classList.add('hidden'); } } else if (e.key === 'Escape') { box.classList.add('hidden'); } };
@@ -751,55 +850,375 @@ window.confirmKeypad = () => {
 			return candidates.slice(0, 7);
 		}
         // 修改後的顯示函式：統一處理相似推薦
-// 修改後的顯示函式：增加「自動查找名稱」以觸發相似推薦
+
+// --- 樂高屬性分類器 (Brick Architect 完整版 - 修正語法錯誤) ---
+window.getLegoCategory = (id, name) => {
+    const n = name ? name.toLowerCase() : "";
+    
+    // 1. ELECTRONICS (電子件)
+    if (n.includes("motor") || n.includes("sensor") || n.includes("hub") || n.includes("battery") || n.includes("electric") || n.includes("light") || n.includes("wire")) return "ELECTRONICS";
+
+    // 2. TECHNIC (科技系列)
+    if (n.includes("technic")) {
+        if (n.includes("beam") || n.includes("liftarm")) return "TECHNIC-beam";
+        if (n.includes("gear") || n.includes("rack") || n.includes("differential") || n.includes("clutch")) return "TECHNIC-gear";
+        if (n.includes("pin") || n.includes("connector") || n.includes("bush")) return "TECHNIC-pin";
+        if (n.includes("axle")) return "TECHNIC-axle";
+        if (n.includes("shock") || n.includes("suspension")) return "TECHNIC-steering";
+        if (n.includes("panel")) return "TECHNIC-panel";
+        return "TECHNIC";
+    }
+
+    // 3. MINIFIG (人偶與配件)
+    if (n.includes("minifigure") || n.includes("minifig") || n.includes("torso") || n.includes("legs") || n.includes("hair") || n.includes("head") || n.includes("helmet")) return "MINIFIG";
+    if (n.includes("sword") || n.includes("shield") || n.includes("weapon") || n.includes("utensil") || n.includes("tool") || n.includes("food")) return "MINIFIG-accessory";
+
+    // 4. NATURE (自然)
+    if (n.includes("plant") || n.includes("flower") || n.includes("leaf") || n.includes("tree") || n.includes("grass") || n.includes("stem") || n.includes("limb")) return "NATURE-plant";
+    if (n.includes("animal") || n.includes("creature") || n.includes("rock") || n.includes("crystal") || n.includes("flame") || n.includes("water") || n.includes("ice")) return "NATURE-element";
+
+    // 5. VEHICLE (載具)
+    if (n.includes("wheel") || n.includes("tire") || n.includes("tyre") || n.includes("rim")) return "VEHICLE-wheel";
+    if (n.includes("windscreen") || n.includes("windshield") || n.includes("cockpit") || n.includes("chassis") || n.includes("mudguard")) return "VEHICLE-body";
+    if (n.includes("propeller") || n.includes("rotor")) return "VEHICLE-air";
+
+    // 6. ARTICULATION (關節與活動件)
+    if (n.includes("hinge") || n.includes("turntable") || n.includes("joint") || n.includes("socket") || n.includes("ball") && n.includes("joint")) return "ARTICULATION";
+    if (n.includes("click") && n.includes("hinge")) return "ARTICULATION";
+
+    // 7. SNOT (側向顆粒)
+    if (n.includes("bracket")) return "SNOT-bracket";
+    if ((n.includes("brick") || n.includes("plate")) && (n.includes("knob") || n.includes("studs on side") || n.includes("headlight"))) return "SNOT-brick";
+
+    // 8. CURVE (圓弧件)
+    if (n.includes("curved") || n.includes("arch") || n.includes("round brick") || n.includes("round corner") || n.includes("cylinder") || n.includes("cone") || n.includes("dome") || n.includes("dish") || n.includes("macaroni")) return "CURVE";
+
+    // 9. ANGLE (斜角件)
+    if (n.includes("slope") || n.includes("wedge") || n.includes("roof")) return "ANGLE";
+
+    // 10. WALL (牆壁與門窗)
+    if (n.includes("window") || n.includes("door") || n.includes("frame") || n.includes("pane") || n.includes("glass") || n.includes("shutter")) return "WALL-window";
+    if (n.includes("fence") || n.includes("railing") || n.includes("ladder") || n.includes("stairs") || n.includes("panel")) return "WALL-structure";
+
+    // 11. BASIC (基本磚)
+    if (n.includes("tile")) {
+        if (n.includes("round")) return "BASIC-round tile";
+        return "BASIC-tile";
+    }
+    if (n.includes("plate")) {
+        if (n.includes("round")) return "BASIC-round plate";
+        return "BASIC-plate";
+    }
+    if (n.includes("brick")) {
+        if (n.includes("round")) return "BASIC-round brick";
+        return "BASIC-brick";
+    }
+    if (n.includes("baseplate")) return "BASIC-baseplate";
+
+    // 12. 特殊 ID 補完 (針對容易判斷錯誤的)
+    const i = id.toString();
+    const map = {
+        "62113": "WALL-window", 
+        "98283": "WALL-structure", // [修正] 這裡加上了註解符號
+        "3005": "BASIC-brick", "3004": "BASIC-brick",
+        "3023": "BASIC-plate", "3024": "BASIC-plate"
+    };
+    if (map[i]) return map[i];
+
+    return "OTHER";
+};
+// --- Brick Architect Most Common Parts Ranking (Top 100 Fixed) ---
+// [修正] 移除重複鍵值，修復 Rank 5 消失的問題
+// --- Brick Architect / Rebrickable Most Common Parts Ranking (Top 360) ---
+// 請完全覆蓋舊的 window.partRanks
+window.partRanks = {
+    // Top 1-100 (Core Essentials)
+    "3023": 1, "3024": 2, "3004": 3, "3020": 4, "3005": 5, "3069b": 6, "54200": 7, "3710": 8, "3003": 9, "3022": 10,
+    "3021": 11, "2780": 12, "3001": 13, "3002": 14, "3010": 15, "3623": 16, "3666": 17, "3009": 18, "3795": 19, "4073": 20,
+    "11477": 21, "2420": 22, "85984": 23, "3068b": 24, "32028": 25, "98138": 26, "3008": 27, "6636": 28, "3622": 29, "15068": 30,
+    "2431": 31, "2412b": 32, "3039": 33, "15573": 34, "2456": 35, "3040": 36, "3062b": 37, "63864": 38, "99781": 39, "30374": 40,
+    "2877": 41, "4032": 42, "87087": 43, "3298": 44, "3034": 45, "18654": 46, "4070": 47, "3040b": 48, "32000": 49, "3700": 50,
+    "44728": 51, "60470": 52, "6141": 53, "3032": 54, "60478": 55, "4085d": 56, "14719": 57, "15208": 58, "60470b": 59, "2357": 60,
+    "11211": 61, "30136": 62, "26603": 63, "3660": 64, "4286": 65, "2429c01": 66, "6558": 67, "3070b": 68, "63868": 69, "25269": 70,
+    "18651": 71, "43093": 72, "3035": 73, "3045": 74, "32062": 75, "48336": 76, "99207": 77, "22885": 78, "3069": 79, "32054": 80,
+    "32064": 81, "3665": 82, "4162": 83, "4274": 84, "3705": 85, "6587": 86, "30503": 87, "85969": 88, "2450": 89, "4150": 90,
+    "3701": 91, "2445": 92, "3941": 93, "32140": 94, "2432": 95, "48729b": 96, "93273": 97, "32013": 98, "60596": 99, "60897": 100,
+
+    // Top 101-200 (Common Construction & SNOT)
+    "87079": 101, "3706": 102, "60477": 103, "30414": 104, "3794b": 105, "2555": 106, "15712": 107, "3006": 108, "2357": 109, "32009": 110,
+    "41678": 111, "63965": 112, "32523": 113, "32073": 114, "99780": 115, "4519": 116, "2458": 117, "6536": 118, "32316": 119, "32270": 120,
+    "2436": 121, "2817": 122, "11458": 123, "2540": 124, "3029": 125, "18674": 126, "32524": 127, "41539": 128, "6632": 129, "32184": 130,
+    "41770": 131, "2423": 132, "2419": 133, "85080": 134, "22889": 135, "32039": 136, "32525": 137, "3702": 138, "4265c": 139, "3036": 140,
+    "32015": 141, "32034": 142, "60592": 143, "61332": 144, "24866": 145, "32123": 146, "41769": 147, "30565": 148, "24307": 149, "24299": 150,
+    "2449": 151, "48989": 152, "41740": 153, "42003": 154, "92907": 155, "3707": 156, "2460": 157, "32014": 158, "3737": 159, "2453": 160,
+    "2465": 161, "6538c": 162, "44709": 163, "49307": 164, "4740": 165, "2654": 166, "3031": 167, "3033": 168, "4733": 169, "87580": 170,
+    "26601": 171, "41239": 172, "32271": 173, "32556": 174, "61903": 175, "2569": 176, "3063": 177, "3937": 178, "3938": 179, "43857": 180,
+    "40359": 181, "40358": 182, "6091": 183, "24121": 184, "32449": 185, "32269": 186, "32016": 187, "4185": 188, "2489": 189, "2496": 190,
+    "4211": 191, "4216": 192, "3829c01": 193, "30357": 194, "24309": 195, "24316": 196, "32002": 197, "32019": 198, "61780": 199, "60481": 200,
+
+    // Top 201-300 (Varied Shapes & Technic)
+    "3659": 201, "3043": 202, "3048": 203, "3044": 204, "36840": 205, "13547": 206, "2921": 207, "53451": 208, "54383": 209, "54384": 210,
+    "43722": 211, "43723": 212, "29119": 213, "29120": 214, "41751": 215, "32278": 216, "32291": 217, "62462": 218, "6589": 219, "6629": 220,
+    "41677": 221, "32498": 222, "30377": 223, "2825": 224, "32012": 225, "32018": 226, "32138": 227, "42127": 228, "30137": 229, "24855": 230,
+    "15458": 231, "35397": 232, "3839b": 233, "3680": 234, "3679": 235, "3713": 236, "6590": 237, "3749": 238, "32005": 239, "32177": 240,
+    "11478": 241, "15070": 242, "36841": 243, "36842": 244, "61678": 245, "11153": 246, "61409": 247, "32001": 248, "32249": 249, "32348": 250,
+    "32526": 251, "4019": 252, "42003": 253, "32192": 254, "15100": 255, "6553": 256, "32200": 257, "32202": 258, "6541": 259, "44294": 260,
+    "32056": 261, "32235": 262, "32324": 263, "15461": 264, "6183": 265, "6096": 266, "6064": 267, "61485": 268, "63869": 269, "92438": 270,
+    "20482": 271, "3176": 272, "2417": 273, "32198": 274, "18947": 275, "32136": 276, "60593": 277, "60601": 278, "40379": 279, "30153": 280,
+    "2494": 281, "4345": 282, "4346": 283, "3007": 284, "14769": 285, "4158": 286, "4162": 287, "4176": 288, "2476": 289, "2462": 290,
+    "2577": 291, "4185": 292, "27925": 293, "3027": 294, "3028": 295, "3030": 296, "3035": 297, "3036": 298, "3460": 299, "3665": 300,
+
+    // Top 301-360 (Specialized & Decorations)
+    "3660": 301, "3673": 302, "3703": 303, "3738": 304, "3794": 305, "3899": 306, "3933": 307, "3934": 308, "3956": 309, "3957": 310,
+    "3959": 311, "3960": 312, "3962": 313, "4032b": 314, "4079": 315, "4081b": 316, "4083": 317, "41740": 318, "41764": 319, "41765": 320,
+    "41767": 321, "41768": 322, "42446": 323, "42929": 324, "4304": 325, "4315": 326, "43710": 327, "43711": 328, "43712": 329, "43719": 330,
+    "43720": 331, "43721": 332, "44300": 333, "44301": 334, "44302": 335, "44567": 336, "4477": 337, "44809": 338, "44822": 339, "44860": 340,
+    "44861": 341, "4490": 342, "4510": 343, "4528": 344, "4532": 345, "4533": 346, "4536": 347, "4588": 348, "4589": 349, "4589b": 350,
+    "4592": 351, "4592c02": 352, "4593": 353, "4594": 354, "4595": 355, "4598": 356, "4599": 357, "4599b": 358, "4623": 359, "4697b": 360
+};
+
+// 重新建立反向索引
+window.rankToPartMap = {};
+if (window.partRanks) {
+    Object.entries(window.partRanks).forEach(([id, rank]) => {
+        window.rankToPartMap[rank] = id;
+    });
+}
+// --- 排名導航系統 ---
+        
+        // 1. 建立反向索引 (Rank -> ID)
+        window.rankToPartMap = {};
+        // 確保 partRanks 已經定義，然後執行反轉
+        if (window.partRanks) {
+            Object.entries(window.partRanks).forEach(([id, rank]) => {
+                window.rankToPartMap[rank] = id;
+            });
+        }
+
+        let currentNavRank = 1;
+
+        window.openRankModal = (rank) => {
+            currentNavRank = parseInt(rank) || 1;
+            updateRankModalUI();
+            document.getElementById('rank-nav-modal').classList.remove('hidden');
+            // 自動聚焦輸入框，方便直接打數字
+            setTimeout(() => document.getElementById('rank-jump-input').focus(), 100);
+        };
+
+        window.closeRankModal = () => {
+            document.getElementById('rank-nav-modal').classList.add('hidden');
+        };
+
+        window.navRank = (delta) => {
+            const nextRank = currentNavRank + delta;
+            
+            // 只要在 1~100 名內，就允許跳轉 (不管資料庫有沒有這個零件)
+            if (window.rankToPartMap[nextRank]) {
+                currentNavRank = nextRank;
+                
+                // 1. 取得目標 ID
+                const targetPartId = window.rankToPartMap[currentNavRank];
+                
+                // 2. 呼叫主畫面顯示 (如果沒資料，checkAndDisplayDrawer 會自動切換成 "新增模式")
+                checkAndDisplayDrawer(targetPartId);
+                
+                // 3. 更新彈出視窗 (顯示排名與縮圖)
+                updateRankModalUI();
+            } else {
+                // 超出範圍 (例如 101) 的抖動特效
+                const btn = delta > 0 ? document.querySelector('button[onclick="navRank(1)"]') : document.querySelector('button[onclick="navRank(-1)"]');
+                if(btn) {
+                    btn.classList.add('shake');
+                    setTimeout(() => btn.classList.remove('shake'), 300);
+                }
+            }
+        };
+
+        window.jumpToRank = () => {
+            const val = parseInt(document.getElementById('rank-jump-input').value);
+            
+            // 防呆：如果沒輸入數字就沒反應
+            if (!val) return;
+
+            if (window.rankToPartMap[val]) {
+                currentNavRank = val;
+                const targetPartId = window.rankToPartMap[currentNavRank];
+                
+                // 1. 關閉導航視窗
+                closeRankModal();
+                
+                // 2. [NEW] 同步關閉數字鍵盤 (Keypad)
+                if (typeof closeKeypad === 'function') {
+                    closeKeypad();
+                } else {
+                    // 保險起見的備用方案 (如果找不到函式，直接隱藏 DOM)
+                    const kp = document.getElementById('numpad-modal');
+                    if(kp) kp.classList.add('hidden');
+                }
+                
+                // 3. 執行跳轉
+                checkAndDisplayDrawer(targetPartId);
+                
+                // 4. 重置狀態
+                updateRankModalUI();
+                document.getElementById('rank-jump-input').value = ''; 
+            } else {
+                alert("找不到該名次的零件 (僅收錄 Top 100)");
+                document.getElementById('rank-jump-input').value = ''; 
+            }
+        };
+
+		// 輔助：取得零件圖片 (優先用資料庫，沒有則用外部圖庫)
+        function getRankImage(partId) {
+            const localData = (window.mappings || {})[partId];
+            if (localData && localData.img) {
+                return localData.img;
+            }
+            // Fallback: 使用 Rebrickable LDraw 圖片庫 (通常非常準確)
+            return `https://cdn.rebrickable.com/media/parts/ldraw/0/${partId}.png`;
+        }
+
+        // 更新排名視窗 UI (支援顯示現有庫存連結)
+        function updateRankModalUI() {
+            const rank = currentNavRank;
+            const partId = window.rankToPartMap[rank];
+            
+            // 1. 更新排名數字
+            document.getElementById('rank-modal-current').innerText = rank;
+
+            // 2. 更新 Part ID 與圖片
+            const idDisplay = document.getElementById('rank-modal-part-id'); // 下方的大字 ID
+            const imgEl = document.getElementById('rank-modal-img');
+            
+            if (partId) {
+                if(idDisplay) {
+                    idDisplay.innerText = partId;
+                    idDisplay.className = "font-mono font-bold text-lg text-blue-600";
+                }
+                imgEl.src = getRankImage(partId);
+                imgEl.style.opacity = "1";
+            } else {
+                if(idDisplay) {
+                    idDisplay.innerText = "---";
+                    idDisplay.className = "font-mono font-bold text-lg text-gray-300";
+                }
+                imgEl.src = "";
+                imgEl.style.opacity = "0";
+            }
+
+            // 3. [NEW] 更新中間的抽屜連結
+            const drawerContainer = document.getElementById('rank-modal-drawers');
+            drawerContainer.innerHTML = ''; // 清空舊內容
+
+            // 從本地資料庫查找該零件
+            const localData = partId ? (window.mappings || {})[partId] : null;
+
+            if (localData && localData.drawers && localData.drawers.length > 0) {
+                // 如果有庫存，生成按鈕
+                localData.drawers.forEach(d => {
+                    const dStr = d.toString();
+                    const num = parseInt(dStr.replace('a', ''));
+                    const isBag = num >= 478;
+                    
+                    // 樣式設定
+                    const bgClass = isBag ? "bg-purple-100 text-purple-700 border-purple-200" : "bg-green-100 text-green-700 border-green-200";
+                    const icon = isBag ? '<i class="fa-solid fa-bag-shopping mr-1"></i>' : '<i class="fa-solid fa-box-open mr-1"></i>';
+                    
+                    const btn = document.createElement('button');
+                    btn.className = `${bgClass} border px-2 py-1 rounded text-xs font-bold shadow-sm hover:scale-105 active:scale-95 transition flex items-center whitespace-nowrap`;
+                    btn.innerHTML = `${icon}${num}`;
+                    
+                    // 點擊跳轉事件
+                    btn.onclick = () => {
+                        closeRankModal(); // 關閉排名視窗
+                        if(typeof closeKeypad === 'function') closeKeypad(); // 關閉鍵盤
+                        
+                        // 開啟該抽屜的詳情 (模擬點擊抽屜)
+                        openDrawerContent(num.toString());
+                    };
+                    
+                    drawerContainer.appendChild(btn);
+                });
+            } else {
+                // 如果沒有庫存，顯示提示文字
+                drawerContainer.innerHTML = '<span class="text-[10px] text-gray-300 font-bold border border-dashed border-gray-300 px-2 py-1 rounded">未擁有</span>';
+            }
+        }
+// 修改後的顯示函式：新增 Brick Architect 排名顯示
 function checkAndDisplayDrawer(partId) {
     currentPartId = partId;
     const partData = (window.mappings || {})[partId];
     const drawers = partData ? partData.drawers : [];
     
-    // --- [NEW] 關鍵修正：確保有名字可以用於相似搜尋 ---
-    // 優先順序：1. 目前全域暫存 > 2. 資料庫庫存 > 3. 內建目錄(Catalog)
+    // --- 名稱查找邏輯 ---
     let displayName = currentPartName;
-    
-    if (!displayName && partData && partData.name) {
-        displayName = partData.name;
-    }
-    
-    // 如果還是沒名字，嘗試從靜態目錄 (window.catalogIndex) 查找
+    if (!displayName && partData && partData.name) displayName = partData.name;
     if (!displayName && window.catalogIndex) {
-        // 使用寬鬆比對 (==) 避免字串/數字型別問題
         const catItem = window.catalogIndex.find(c => c.id == partId);
         if (catItem) displayName = catItem.name;
     }
-
-    // 更新全域名稱，確保後續操作(如新增)能抓到名字
     if (displayName) currentPartName = displayName;
-    // ------------------------------------------------
 
     // 1. 更新基本資料 UI
     document.getElementById('res-part-id').textContent = partId;
-    document.getElementById('res-part-name').textContent = displayName || "---"; // 使用找到的名字
+    document.getElementById('res-part-name').textContent = displayName || "---";
     
     const img = document.getElementById('api-img');
     const url = currentPartImgUrl || partData?.img;
     if(url) { img.src = url; img.classList.remove('hidden'); } else { img.classList.add('hidden'); }
     
     document.getElementById('result-area').classList.remove('hidden');
+
+    // --- 更新右上角屬性標籤 ---
+    const category = window.getLegoCategory(partId, displayName || "");
+    const sourceBadge = document.getElementById('res-source');
+    sourceBadge.textContent = category;
     
-    // 2. 處理狀態分支 (已存在 vs 新零件)
+    if (category.startsWith("BASIC")) {
+        sourceBadge.className = "text-[10px] px-2 py-0.5 rounded bg-blue-600 text-white font-bold uppercase tracking-wider shadow-sm";
+    } else if (category.startsWith("TECHNIC")) {
+        sourceBadge.className = "text-[10px] px-2 py-0.5 rounded bg-gray-600 text-white font-bold uppercase tracking-wider shadow-sm";
+    } else {
+        sourceBadge.className = "text-[10px] px-2 py-0.5 rounded bg-purple-500 text-white font-bold uppercase tracking-wider shadow-sm";
+    }
+
+    // --- [NEW] 新增排名 (Rank) 顯示區塊 ---
+    // 檢查舊的 Rank 元素是否存在，如果不存在就建立它 (插入到 sourceBadge 的父層)
+    // --- 更新排名 (Rank) 顯示區塊 ---
+    let rankBadge = document.getElementById('res-rank-badge');
+    if (!rankBadge) {
+        const parent = sourceBadge.parentElement;
+        rankBadge = document.createElement('div');
+        rankBadge.id = 'res-rank-badge';
+        rankBadge.className = "mt-2 flex flex-col items-end hidden"; 
+        parent.appendChild(rankBadge);
+    }
+
+    const rank = window.partRanks[partId.toString()];
+    
+    if (rank) {
+        rankBadge.innerHTML = `
+            <div onclick="openRankModal(${rank})" class="border-2 border-gray-300 rounded-lg p-1 min-w-[3rem] flex flex-col items-center justify-center bg-gray-50 cursor-pointer hover:border-blue-400 hover:bg-blue-50 hover:scale-105 transition group" title="點擊開啟排名導航">
+                <span class="text-[8px] text-gray-400 font-bold leading-none mb-0.5 group-hover:text-blue-400">RANK</span>
+                <span class="text-lg font-black text-gray-700 leading-none font-mono group-hover:text-blue-600">${rank}</span>
+            </div>
+        `;
+        rankBadge.classList.remove('hidden');
+    } else {
+        rankBadge.classList.add('hidden');
+    }
+    // ------------------------------------
+
+    // 2. 處理庫存狀態 (已存在 vs 新零件)
     if(drawers.length > 0) {
-        // --- 狀態：已存在 ---
         document.getElementById('status-exist').classList.remove('hidden');
         document.getElementById('status-new').classList.add('hidden');
         
-        // 重置操作區
         document.getElementById('dynamic-action-area').classList.add('hidden');
         document.getElementById('exist-actions').classList.remove('hidden');
         
-        // 視覺風格：綠色
         document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-green-500 transition-all"; 
         
-        // 顯示目前位置列表
         document.getElementById('drawer-list').innerHTML = drawers.map(d => {
             const num = parseInt(d.toString().replace('a',''));
             const label = num > 477 ? `<i class="fa-solid fa-bag-shopping mr-1"></i>夾鏈袋 ${d}` : `<i class="fa-solid fa-box-open mr-1"></i>抽屜 ${d}`;
@@ -808,35 +1227,39 @@ function checkAndDisplayDrawer(partId) {
         }).join('');
 
     } else {
-        // --- 狀態：新零件 ---
         document.getElementById('status-exist').classList.add('hidden');
         document.getElementById('status-new').classList.remove('hidden');
         
-        // 視覺風格：黃色
         document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-yellow-400 transition-all"; 
         
-        // 自動載入「新增」面板
         setupActionPanel('add', document.getElementById('inline-action-panel'));
         const inp = document.getElementById('drawer-input-active'); 
         if(inp) inp.value = getNextEmptyDrawerId();
     }
 
-    // 3. 統一處理相似零件推薦
+    // 3. 相似零件推薦
     const uniContainer = document.getElementById('universal-suggestions');
     const uniList = document.getElementById('universal-similar-list');
     
-    // 使用剛剛努力找到的 displayName 進行搜尋
     const suggestions = findSimilarParts(displayName || "");
     
     if (suggestions.length > 0) {
         uniList.innerHTML = suggestions.map(s => {
             const dNum = parseInt(s.drawers[0].toString().replace('a',''));
             const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
+            const cat = window.getLegoCategory(s.id, s.name);
             
+            const imgHtml = s.img ? 
+                `<img src="${s.img}" onclick="event.stopPropagation(); selectPartFromDrawer('${s.id}')" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50 cursor-pointer hover:ring-2 hover:ring-blue-400 transition" title="點擊跳轉至此零件">` : 
+                `<div onclick="event.stopPropagation(); selectPartFromDrawer('${s.id}')" class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-blue-400 transition" title="點擊跳轉至此零件"><i class="fa-solid fa-cube text-gray-400"></i></div>`;
+
             return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg cursor-pointer hover:bg-purple-50 transition shadow-sm group">
-                ${s.img?`<img src="${s.img}" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50">`:'<div class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center"><i class="fa-solid fa-cube text-gray-400"></i></div>'}
+                ${imgHtml}
                 <div class="flex-1 min-w-0" onclick="useSuggestedDrawer('${s.drawers[0]}')">
-                    <div class="text-xs font-bold text-gray-700 truncate">${s.name}</div>
+                    <div class="flex items-center gap-2">
+                        <div class="text-xs font-bold text-gray-700 truncate">${s.name}</div>
+                        <span class="text-[8px] bg-gray-100 text-gray-500 px-1 rounded border">${cat}</span>
+                    </div>
                     <div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div>
                 </div>
                 <span onclick="event.stopPropagation(); openDrawerContent('${s.drawers[0].toString().replace('a','')}')" class="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded group-hover:bg-purple-200 transition hover:underline hover:scale-105 transform">${locLabel}</span>
@@ -848,46 +1271,103 @@ function checkAndDisplayDrawer(partId) {
     }
 }
         // 優化後的套用抽屜函式
+
 window.useSuggestedDrawer = (drawerId) => { 
     const dStr = drawerId.toString(); 
     
-    // 檢查是否有正在活動的輸入框
     let input = document.getElementById('drawer-input-active');
-    
-    // [UX 優化] 如果目前沒有開啟的操作面板 (input 不存在)，自動開啟「移動位置」模式
-    if (!input) {
-        // 如果是新零件模式下的 inline panel
-        const inlineInput = document.getElementById('inline-action-panel').querySelector('#drawer-input-active');
+    const dynamicArea = document.getElementById('dynamic-action-area');
+
+    // [關鍵修正邏輯]
+    // 判斷面板是否處於「隱藏狀態」
+    // 如果 dynamicArea 存在且含有 hidden class，代表雖然 input 還在，但使用者看不見
+    const isHidden = dynamicArea && dynamicArea.classList.contains('hidden');
+
+    // 如果 input 不存在 (第一次) 或 面板被隱藏了 (切換過畫面)，都要重新開啟
+    if (!input || isHidden) {
+        // 先檢查是否是「新零件」模式下的 inline input (那個通常不會被隱藏)
+        const inlineContainer = document.getElementById('inline-action-panel');
+        const inlineInput = inlineContainer ? inlineContainer.querySelector('#drawer-input-active') : null;
+
         if (inlineInput) {
             input = inlineInput;
         } else {
-            // 零件已存在，且面板未開 -> 自動開啟 "Move" 面板
+            // 如果不是新零件，就代表是舊零件，強制開啟「移動位置」面板，並解除 hidden 狀態
             showActionPanel('move');
             input = document.getElementById('drawer-input-active');
         }
     }
 
-    // 執行填入數值
+    // 執行填入數值與視覺回饋
     if (input) {
         const checkbox = input.parentElement.parentElement.querySelector('input[type="checkbox"]'); 
         input.value = dStr.replace('a',''); 
         if(checkbox) checkbox.checked = dStr.includes('a'); 
         
-        // 滾動到操作區，讓使用者看到數值變了
+        // 滾動到操作區
         input.scrollIntoView({behavior: 'smooth', block: 'center'}); 
         
-        // 視覺回饋：讓輸入框閃爍一下
+        // 閃爍特效
         input.classList.add('ring-4', 'ring-purple-300');
         setTimeout(() => input.classList.remove('ring-4', 'ring-purple-300'), 500);
     }
 };
+
 		window.showActionPanel = (action) => { const container = document.getElementById('dynamic-action-area'); container.classList.remove('hidden'); document.getElementById('exist-actions').classList.add('hidden'); setupActionPanel(action, container); document.getElementById('drawer-input-active').value = getNextEmptyDrawerId(); };
-        function setupActionPanel(action, container) { currentAction = action; container.innerHTML = document.getElementById('action-panel-template').innerHTML; const btn = container.querySelector('#confirm-btn'); const label = container.querySelector('#action-label'); if (action === 'add') { btn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'text-white'); btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i> 確認加入'; label.textContent = "加入位置："; } else { btn.classList.add('bg-red-500', 'hover:bg-red-600', 'text-white'); btn.innerHTML = '<i class="fa-solid fa-arrow-right-arrow-left mr-2"></i> 確認移動 (覆蓋)'; label.textContent = "移動至："; } const input = container.querySelector('#drawer-input'); input.id = 'drawer-input-active'; input.onclick = () => openKeypad('drawer-input-active'); container.querySelector('#confirm-btn').onclick = executeAction; }
-        window.adjustDrawer = (delta) => { const input = document.getElementById('drawer-input-active'); if(input) { let val = parseInt(input.value)||1; val+=delta; if(val<1)val=1; if(val>9999)val=9999; input.value=val; } };
+        function setupActionPanel(action, container) { 
+            currentAction = action; 
+            container.innerHTML = document.getElementById('action-panel-template').innerHTML; 
+            
+            const btn = container.querySelector('#confirm-btn'); 
+            const label = container.querySelector('#action-label'); 
+            
+            if (action === 'add') { 
+                btn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'text-white'); 
+                btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i> 確認加入'; 
+                label.textContent = "加入位置："; 
+            } else { 
+                btn.classList.add('bg-red-500', 'hover:bg-red-600', 'text-white'); 
+                btn.innerHTML = '<i class="fa-solid fa-arrow-right-arrow-left mr-2"></i> 確認移動 (覆蓋)'; 
+                label.textContent = "移動至："; 
+            } 
+            
+            const input = container.querySelector('#drawer-input'); 
+            input.id = 'drawer-input-active'; 
+            
+            // [修正重點] 點擊輸入框時，自動清空內容，方便直接輸入新號碼
+            input.onclick = () => {
+                input.value = ""; // 清空預填的數字 (例如 "3")
+                openKeypad('drawer-input-active');
+            };
+            
+            container.querySelector('#confirm-btn').onclick = executeAction; 
+        }
+		window.adjustDrawer = (delta) => { const input = document.getElementById('drawer-input-active'); if(input) { let val = parseInt(input.value)||1; val+=delta; if(val<1)val=1; if(val>9999)val=9999; input.value=val; } };
         window.executeAction = async () => { if(!currentPartId) return; const num = document.getElementById('drawer-input-active').value; const activeContainer = document.getElementById('drawer-input-active').closest('#inline-action-panel') || document.getElementById('dynamic-action-area'); const isSub = activeContainer.querySelector('input[type="checkbox"]').checked; const targetDrawer = isSub ? `${num}a` : `${num}`; const btn = activeContainer.querySelector('#confirm-btn'); const originalHtml = btn.innerHTML; const originalClass = btn.className; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true; try { if (currentAction === 'move') { if(confirm(`確定移動？\n舊位置將被移除。`)) await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'move'); else { btn.innerHTML = originalHtml; btn.disabled = false; return; } } else { await window.saveMappingCloud(currentPartId, targetDrawer, currentPartName, currentPartImgUrl, 'append'); } btn.className = "w-full py-3.5 rounded-xl font-bold text-white shadow-md bg-green-500 transition-all"; btn.innerHTML = '<i class="fa-solid fa-check"></i> 成功'; setTimeout(() => { btn.className = originalClass; btn.innerHTML = originalHtml; btn.disabled = false; if(!document.getElementById('status-exist').classList.contains('hidden')) { document.getElementById('exist-actions').classList.remove('hidden'); document.getElementById('dynamic-action-area').classList.add('hidden'); } }, 1500); } catch(e) { btn.innerHTML = originalHtml; btn.disabled = false; } };
         window.removeLoc = (drawerId) => { if(confirm(`確定移除？`)) window.removeMappingCloud(currentPartId, drawerId); };
-        window.manualSearch = () => { const id = document.getElementById('part-id-input').value.trim(); if(id) { if(!currentPartName) { currentPartName = ""; currentPartImgUrl = ""; document.getElementById('res-source').textContent = "MANUAL"; document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold"; } document.getElementById('search-suggestions').classList.add('hidden'); checkAndDisplayDrawer(id); } };
-        window.retryWithGemini = async () => { if(!currentResizedBlob || !geminiApiKey) { alert("無圖片或未設定 Key"); return; } document.getElementById('loading').classList.remove('hidden'); document.getElementById('loading-text').innerText = "Gemini 重試中..."; document.getElementById('result-area').classList.add('hidden'); try { const result = await tryGemini(currentResizedBlob); currentPartName = result.name; currentPartImgUrl = ""; document.getElementById('part-id-input').value = result.id; document.getElementById('res-source').textContent = "Gemini (Retry)"; document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-purple-600 text-white font-bold"; checkAndDisplayDrawer(result.id); } catch(e) { alert(e.message); } finally { document.getElementById('loading').classList.add('hidden'); } };
+        // 1. [修正] 手動搜尋：增加 preserveState 參數，控制是否保留上一次的名稱
+window.manualSearch = (preserveState = false) => {
+    const id = document.getElementById('part-id-input').value.trim();
+    if (id) {
+        // 如果不是從「建議清單」點進來的，就要徹底清空過去的狀態
+        if (!preserveState) {
+            currentPartName = "";
+            currentPartImgUrl = "";
+            currentResizedBlob = null; // 清空舊照片資料
+            
+            // 隱藏 Gemini 重試按鈕 (避免誤觸上一張照片的重試)
+            document.getElementById('retry-btn').classList.add('hidden');
+            
+            // 重置來源標籤為 MANUAL
+            document.getElementById('res-source').textContent = "MANUAL";
+            document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-gray-500 text-white font-bold";
+        }
+        
+        document.getElementById('search-suggestions').classList.add('hidden');
+        checkAndDisplayDrawer(id);
+    }
+};
+		window.retryWithGemini = async () => { if(!currentResizedBlob || !geminiApiKey) { alert("無圖片或未設定 Key"); return; } document.getElementById('loading').classList.remove('hidden'); document.getElementById('loading-text').innerText = "Gemini 重試中..."; document.getElementById('result-area').classList.add('hidden'); try { const result = await tryGemini(currentResizedBlob); currentPartName = result.name; currentPartImgUrl = ""; document.getElementById('part-id-input').value = result.id; document.getElementById('res-source').textContent = "Gemini (Retry)"; document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-purple-600 text-white font-bold"; checkAndDisplayDrawer(result.id); } catch(e) { alert(e.message); } finally { document.getElementById('loading').classList.add('hidden'); } };
         function resizeImage(file) { return new Promise((resolve) => { const reader = new FileReader(); reader.onload = (event) => { const img = new Image(); img.onload = () => { const canvas = document.createElement('canvas'); let width = img.width, height = img.height; if (width > 800) { height = Math.round(height * 800 / width); width = 800; } canvas.width = width; canvas.height = height; canvas.getContext('2d').drawImage(img, 0, 0, width, height); canvas.toBlob(resolve, 'image/jpeg', 0.85); }; img.src = event.target.result; }; reader.readAsDataURL(file); }); }
         async function tryBrickognize(blob) { const fd = new FormData(); fd.append('query_image', blob); const res = await fetch('https://api.brickognize.com/predict/', {method:'POST', body:fd}); if(res.ok) { const data = await res.json(); if(data.items?.length > 0) return { id: data.items[0].id, name: data.items[0].name, img: data.items[0].img_url || data.items[0].thumbnail_url, source: 'Brickognize' }; } return null; }
         async function tryGemini(blob) { const b64 = await new Promise(r => { const rd = new FileReader(); rd.onloadend = () => r(rd.result.split(',')[1]); rd.readAsDataURL(blob); }); const prompt = `Identify this Lego part. Return JSON: { "id": "PART_ID", "name": "Part Name" }. IMPORTANT: ALWAYS Append common Traditional Chinese keywords for this part (e.g., "Brick 2x4 基礎磚", "Technic Beam 科技臂", "Gear 齒輪").`; const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ contents:[{parts:[{text:prompt}, {inline_data:{mime_type:"image/jpeg", data:b64}}]}], generationConfig:{responseMimeType:"application/json"} }) }); if(!res.ok) throw new Error("API Error"); const json = await res.json(); const data = JSON.parse(json.candidates[0].content.parts[0].text); return { id: data.id, name: data.name, img: "", source: 'Gemini' }; }
@@ -994,25 +1474,86 @@ window.openKeypad = (id) => {
 
         window.closeDrawerModal = () => { document.getElementById('drawer-modal').classList.add('hidden'); };
         
-        window.selectPartFromDrawer = (partId) => { 
+        // 3. [修正] 從抽屜點選：順手隱藏 Gemini 按鈕
+window.selectPartFromDrawer = (partId) => { 
     closeDrawerModal(); 
 
-    // --- 修正開始：清空暫存狀態 ---
-    // 強制清空全域的圖片和名稱變數，確保 checkAndDisplayDrawer 會讀取資料庫(partData)的內容
+    // 清空暫存狀態
     currentPartImgUrl = ""; 
     currentPartName = ""; 
-    currentResizedBlob = null; // 順手清空圖片 blob，避免誤觸重試按鈕
+    currentResizedBlob = null; 
+    
+    // [NEW] 確保隱藏重試按鈕
+    document.getElementById('retry-btn').classList.add('hidden');
 
-    // 視覺優化：將來源標籤改為 Database 或 Inventory
+    // 視覺優化
     document.getElementById('res-source').textContent = "INVENTORY";
     document.getElementById('res-source').className = "text-[10px] px-2 py-0.5 rounded bg-blue-500 text-white font-bold";
-    // --- 修正結束 ---
 
-    // 延遲一點點執行，確保視覺更新
     setTimeout(() => {
         checkAndDisplayDrawer(partId); 
     }, 100);
 };
     </script>
+	<div id="rank-nav-modal" class="fixed inset-0 z-[90] hidden flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-xs shadow-2xl flex flex-col relative overflow-hidden">
+            
+            <button onclick="closeRankModal()" class="absolute top-2 left-2 z-20 w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition shadow-sm">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="bg-gray-50 p-3 pl-12 border-b relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                    
+                    <div class="flex flex-col items-center min-w-[3rem]">
+                        <h3 class="text-[9px] font-bold text-gray-400 tracking-widest uppercase mb-0.5">RANK</h3>
+                        <div class="text-3xl font-black text-gray-800 flex items-baseline leading-none">
+                            <span class="text-sm text-gray-300 mr-0.5">#</span>
+                            <span id="rank-modal-current">--</span>
+                        </div>
+                    </div>
+
+                    <div id="rank-modal-drawers" class="flex-1 flex flex-wrap items-center justify-center gap-1 mx-2 h-14 overflow-y-auto content-center">
+                        </div>
+
+                    <div class="w-14 h-14 bg-white rounded-lg border border-gray-200 shadow-sm flex items-center justify-center p-1 shrink-0">
+                        <img id="rank-modal-img" src="" class="w-full h-full object-contain opacity-50" onerror="this.style.opacity=0">
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 flex flex-col gap-4">
+                
+                <div class="flex items-center justify-between gap-4">
+                    <button onclick="navRank(-1)" class="w-12 h-12 flex items-center justify-center bg-white border-2 border-gray-200 rounded-xl shadow-sm text-gray-600 text-xl hover:border-blue-400 hover:text-blue-600 active:scale-95 transition">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+
+                    <div class="flex-1 text-center">
+                        <div class="text-[10px] text-gray-400 font-bold mb-1">PART ID</div>
+                        <div id="rank-modal-part-id" class="font-mono font-bold text-lg text-blue-600">---</div>
+                    </div>
+
+                    <button onclick="navRank(1)" class="w-12 h-12 flex items-center justify-center bg-white border-2 border-gray-200 rounded-xl shadow-sm text-gray-600 text-xl hover:border-blue-400 hover:text-blue-600 active:scale-95 transition">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+				
+				<div class="relative">
+                    <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-hashtag text-gray-300 text-xs"></i>
+                    </div>
+                    <input type="text" id="rank-jump-input" placeholder="點擊輸入" 
+                           class="w-full pl-8 pr-12 py-2 border rounded-lg text-center font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer caret-transparent"
+                           readonly
+                           onclick="this.value=''; openKeypad('rank-jump-input')">
+                           
+                    <button onclick="jumpToRank()" class="absolute inset-y-1 right-1 px-3 bg-blue-100 text-blue-600 rounded font-bold text-xs hover:bg-blue-200">
+                        GO
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
