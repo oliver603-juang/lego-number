@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂高抽屜管家 (批次移動版)</title>
+    <title>樂高抽屜管家 (雙鏡頭旗艦版)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2563eb">
@@ -226,6 +226,11 @@
                 window.inventoryIndex = newIndex;
 
                 if (currentPartId) checkAndDisplayDrawer(currentPartId);
+                
+                // [修正] 自動刷新目前開啟的抽屜視窗
+                if (!document.getElementById('drawer-modal').classList.contains('hidden') && currentViewingDrawer) {
+                    openDrawerContent(currentViewingDrawer);
+                }
             });
         }
 
@@ -316,6 +321,18 @@
             openKeypad('global-jump-input');
         };
 
+        // [NEW] Open Rank Jump Keypad
+        window.openRankJumpKeypad = () => {
+            const modal = document.getElementById('keypad-modal');
+            if (!modal.classList.contains('hidden') && currentKeypadTarget === 'global-rank-jump-input') {
+                closeKeypad();
+                return;
+            }
+            const inp = document.getElementById('global-rank-jump-input');
+            inp.value = "";
+            openKeypad('global-rank-jump-input');
+        };
+
         window.openKeypad = (id) => { 
             currentKeypadTarget = id; 
             const modal = document.getElementById('keypad-modal'); 
@@ -330,7 +347,7 @@
                 content.classList.remove('translate-y-full');
             });
             
-            if(id !== 'global-jump-input') {
+            if(id !== 'global-jump-input' && id !== 'global-rank-jump-input') {
                 document.getElementById('main-content').classList.add('pb-keypad'); 
                 setTimeout(() => {
                     const el = document.getElementById(id);
@@ -383,15 +400,87 @@
              const inp = document.getElementById(currentKeypadTarget);
              if(inp) {
                  let val = inp.value;
+                 // 1. Drawer Jump
                  if (currentKeypadTarget === 'global-jump-input') {
                      if (val === "") val = "1";
                      openDrawerContent(val);
                  }
+                 // 2. Rank Modal Jump
                  else if (currentKeypadTarget === 'rank-jump-input') {
                     jumpToRank();
                  }
+                 // 3. [NEW] Homepage Rank Jump
+                 else if (currentKeypadTarget === 'global-rank-jump-input') {
+                    const rank = parseInt(val);
+                    if(rank && window.rankToPartMap[rank]) {
+                        checkAndDisplayDrawer(window.rankToPartMap[rank]);
+                    } else {
+                        alert("找不到該名次的零件 (僅收錄 Top 360)");
+                    }
+                 }
              }
              closeKeypad();
+        };
+
+        // [NEW] 抽屜內快速新增零件 (支援批次)
+        window.quickAddPartsToDrawer = async () => {
+            const input = document.getElementById('drawer-quick-input');
+            const val = input.value.trim();
+            if(!val) return;
+            
+            // 處理批次輸入 (空格或逗號分隔)
+            const ids = val.split(/[\s,]+/).filter(x => x);
+            if(ids.length === 0) return;
+
+            const btn = document.getElementById('drawer-add-btn');
+            const orgHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            try {
+                const targetDrawer = currentViewingDrawer; 
+                
+                for(const id of ids) {
+                    // 嘗試取得名稱與圖片
+                    let name = "", img = "";
+                    const local = window.mappings[id];
+                    const cat = window.catalogIndex.find(c => c.id == id);
+                    
+                    if(local) { name = local.name; img = local.img; }
+                    else if(cat) { name = cat.name; }
+                    
+                    if(!img) img = `https://cdn.rebrickable.com/media/parts/ldraw/0/${id}.png`;
+                    
+                    // 寫入資料庫 (Append 模式)
+                    await window.saveMappingCloud(id, targetDrawer, name, img, 'append');
+                }
+                
+                // 成功回饋
+                input.value = "";
+                btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                btn.classList.add('bg-green-500', 'hover:bg-green-600');
+                btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+                
+                setTimeout(() => {
+                    btn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                    btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    btn.innerHTML = orgHtml;
+                    btn.disabled = false;
+                }, 1000);
+                
+            } catch(e) {
+                alert("新增失敗: " + e.message);
+                btn.innerHTML = orgHtml;
+                btn.disabled = false;
+            }
+        };
+
+        // ------------------ NEW: Camera Reset UI Logic ------------------
+        window.resetPreview = () => {
+            document.getElementById('preview-img').src = "";
+            document.getElementById('preview-img').classList.add('hidden');
+            document.getElementById('retake-hint').classList.add('hidden');
+            document.getElementById('cam-buttons').classList.remove('hidden'); // Ensure buttons are back
         };
 
         initApp();
@@ -422,16 +511,35 @@
     <main id="main-content" class="flex-grow p-4 max-w-md mx-auto w-full pb-24 transition-all relative">
         
         <div class="bg-white p-6 rounded-xl shadow-lg text-center mb-6 relative z-30">
-            <div class="mb-4 relative group cursor-pointer" onclick="startCamera()">
-                <div id="preview-container" class="w-full h-40 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative transition hover:border-blue-400 hover:bg-blue-50">
-                    <div class="text-gray-400 flex flex-col items-center">
-                        <i class="fa-solid fa-camera text-4xl mb-2"></i>
-                        <span class="text-sm font-bold">點擊開啟相機</span>
+            
+            <div class="mb-4 relative">
+                <div id="preview-container" class="w-full h-40 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative">
+                    
+                    <div class="flex gap-8 z-10" id="cam-buttons">
+                        <button onclick="startCamera()" class="flex flex-col items-center justify-center text-gray-400 hover:text-blue-600 transition group">
+                            <div class="w-14 h-14 bg-white rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center mb-2 group-hover:border-blue-400 group-hover:scale-105 transition">
+                                <i class="fa-solid fa-video text-2xl text-blue-400"></i>
+                            </div>
+                            <span class="text-xs font-bold text-gray-500">網頁相機</span>
+                        </button>
+
+                        <button onclick="document.getElementById('camera-input').click()" class="flex flex-col items-center justify-center text-gray-400 hover:text-purple-600 transition group">
+                            <div class="w-14 h-14 bg-white rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center mb-2 group-hover:border-purple-400 group-hover:scale-105 transition">
+                                <i class="fa-solid fa-camera text-2xl text-purple-400"></i>
+                            </div>
+                            <span class="text-xs font-bold text-gray-500">原生相機</span>
+                        </button>
                     </div>
-                    <img id="preview-img" class="absolute inset-0 w-full h-full object-contain hidden" />
+
+                    <img id="preview-img" class="absolute inset-0 w-full h-full object-contain hidden bg-gray-100 z-20 cursor-pointer" onclick="resetPreview()" title="點擊重拍" />
+                    
+                    <div id="retake-hint" class="absolute bottom-2 right-2 z-30 hidden pointer-events-none">
+                        <span class="bg-black/50 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-sm">點擊重拍</span>
+                    </div>
                 </div>
             </div>
-            <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleImageFile(this.files[0])">
+
+            <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onclick="this.value=null" onchange="handleImageFile(this.files[0])">
 
             <div id="loading" class="hidden flex flex-col items-center justify-center py-4">
                 <div class="loader mb-2"></div>
@@ -457,8 +565,17 @@
                 <div id="search-suggestions" class="absolute top-full left-0 right-0 bg-white shadow-xl rounded-b-xl border border-t-0 border-gray-200 max-h-72 overflow-y-auto hidden z-40"></div>
             </div>
 
+            <div class="mt-2 flex justify-between items-center px-1">
+                <button onclick="openRankJumpKeypad()" class="text-xs font-bold text-gray-400 flex items-center hover:text-blue-600 transition">
+                    <i class="fa-solid fa-trophy mr-1"></i> 查看指定RANK
+                </button>
+                <button onclick="openDrawerJumpKeypad()" class="text-xs font-bold text-gray-400 flex items-center hover:text-blue-600 transition">
+                    <i class="fa-solid fa-box-open mr-1"></i> 查看指定抽屜
+                </button>
+            </div>
+
             <input type="hidden" id="global-jump-input">
-        </div>
+            <input type="hidden" id="global-rank-jump-input"> </div>
 
         <div id="result-area" class="hidden space-y-4">
             <div class="bg-white p-4 rounded-xl shadow-lg border-l-4" id="info-card">
@@ -508,7 +625,7 @@
             <div id="batch-card" class="hidden bg-white p-4 rounded-xl shadow-lg border-l-8 border-indigo-500">
                 <div class="flex items-center justify-between mb-4 border-b pb-2">
                     <h2 class="text-xl font-black text-gray-800 flex items-center">
-                        <i class="fa-solid fa-layer-group mr-2 text-indigo-500"></i> 批次加入模式
+                        <i class="fa-solid fa-layer-group mr-2 text-indigo-500"></i> 批次移動模式
                     </h2>
                     <span class="bg-indigo-100 text-indigo-700 font-bold px-3 py-1 rounded-full text-xs" id="batch-count">0 items</span>
                 </div>
@@ -576,6 +693,21 @@
 					</button>
 				</div>
             </div>
+            
+            <div class="px-4 py-3 bg-gray-50 border-b flex gap-2 items-center">
+                <div class="relative flex-1">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-plus text-gray-400"></i>
+                    </div>
+                    <input type="text" id="drawer-quick-input" placeholder="輸入零件碼 (空格分隔批次)" 
+                           class="w-full pl-9 pr-3 py-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none uppercase shadow-inner"
+                           onkeypress="if(event.key === 'Enter') quickAddPartsToDrawer()">
+                </div>
+                <button id="drawer-add-btn" onclick="quickAddPartsToDrawer()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow hover:bg-blue-700 active:scale-95 transition">
+                    加入
+                </button>
+            </div>
+
             <div id="drawer-modal-content" class="p-4 overflow-y-auto grid grid-cols-3 gap-3 bg-gray-50/50"></div>
         </div>
     </div>
@@ -765,6 +897,10 @@
                      previewImg.src = url;
                      previewImg.classList.remove('hidden');
                 }
+                
+                // [NEW] 拍照後自動隱藏按鈕，顯示重拍提示
+                document.getElementById('cam-buttons').classList.add('hidden');
+                document.getElementById('retake-hint').classList.remove('hidden');
 
                 let result = await tryBrickognize(resizedBlob);
                 if (!result) {
@@ -1164,22 +1300,62 @@
         function getNextEmptyDrawerId() { const used = new Set(); Object.values(window.mappings || {}).forEach(d => { if(d.drawers) d.drawers.forEach(dr => used.add(dr.toString().replace('a',''))); }); for(let i=1; i<=9999; i++) if(!used.has(i.toString())) return i; return 1; }
         function levenshtein(a,b){if(a.length===0)return b.length;if(b.length===0)return a.length;var matrix=[];for(var i=0;i<=b.length;i++)matrix[i]=[i];for(var j=0;j<=a.length;j++)matrix[0][j]=j;for(var i=1;i<=b.length;i++){for(var j=1;j<=a.length;j++){if(b.charAt(i-1)==a.charAt(j-1))matrix[i][j]=matrix[i-1][j-1];else matrix[i][j]=Math.min(matrix[i-1][j-1]+1,Math.min(matrix[i][j-1]+1,matrix[i-1][j]+1))}}return matrix[b.length][a.length]}
         
+        // --- 優化版：相似零件推薦演算法 (加入分類權重) ---
         function findSimilarParts(targetName) {
             if (!targetName) return [];
+            
+            const targetId = currentPartId || "";
+            const targetCategory = window.getLegoCategory(targetId, targetName);
+            const targetMainCat = targetCategory.split('-')[0]; // 例如 "TECHNIC-beam" 取 "TECHNIC"
+            
             const candidates = [];
-            const target = targetName.toLowerCase();
+            const targetLower = targetName.toLowerCase();
+
+            // 遍歷 Firebase 同步下來的庫存資料
             Object.entries(window.mappings).forEach(([id, data]) => {
+                // 1. 排除自己
+                if (id === targetId) return;
+                
                 if (data.name && data.drawers.length > 0) {
                     const nameLower = data.name.toLowerCase();
-                    if (nameLower === target) return;
-                    const dist = levenshtein(target, nameLower);
-                    if (dist < Math.max(target.length, nameLower.length) * 0.8) {
-                        candidates.push({ ...data, id, dist });
+                    const itemCategory = window.getLegoCategory(id, data.name);
+                    const itemMainCat = itemCategory.split('-')[0];
+
+                    // --- 分數計算開始 ---
+                    let score = 0;
+
+                    // A. 文字相似度 (Levenshtein) - 基礎分 0~100
+                    const dist = levenshtein(targetLower, nameLower);
+                    const maxLen = Math.max(targetLower.length, nameLower.length);
+                    // 轉換為相似度分數 (距離越小，分數越高)
+                    const similarity = (1 - dist / maxLen) * 100;
+                    score += similarity;
+
+                    // B. 分類加權 (Category Boost) - 這是優化核心！
+                    if (itemCategory === targetCategory) {
+                        score += 150; // 細分類相同 (例如都是 TECHNIC-beam) -> 超級優先
+                    } else if (itemMainCat === targetMainCat) {
+                        score += 80;  // 主分類相同 (例如都是 TECHNIC) -> 優先
+                    } else if (itemMainCat === 'BASIC' && targetMainCat === 'BASIC') {
+                        score += 30;  // 都是基本磚 -> 稍微優先
+                    }
+
+                    // C. 關鍵字加權
+                    if (targetLower.includes("plate") && nameLower.includes("plate")) score += 20;
+                    if (targetLower.includes("tile") && nameLower.includes("tile")) score += 20;
+                    if (targetLower.includes("round") && nameLower.includes("round")) score += 20;
+
+                    // D. 門檻篩選
+                    // 如果分類不同，文字相似度必須很高才收錄；如果分類相同，門檻可降低
+                    if (score > 60) { 
+                        candidates.push({ ...data, id, score, category: itemCategory });
                     }
                 }
             });
-            candidates.sort((a, b) => a.dist - b.dist);
-            return candidates.slice(0, 7);
+
+            // 依照分數高低排序，取前 6 名
+            candidates.sort((a, b) => b.score - a.score);
+            return candidates.slice(0, 6);
         }
 
         window.getLegoCategory = (id, name) => {
@@ -1471,6 +1647,14 @@
                 drawerContainer.innerHTML = '<span class="text-[10px] text-gray-300 font-bold border border-dashed border-gray-300 px-2 py-1 rounded">未擁有</span>';
             }
         }
+
+        // [NEW] 重置相機介面
+        window.resetPreview = () => {
+            document.getElementById('preview-img').src = "";
+            document.getElementById('preview-img').classList.add('hidden');
+            document.getElementById('retake-hint').classList.add('hidden');
+            document.getElementById('cam-buttons').classList.remove('hidden'); // 確保按鈕重新出現
+        };
     </script>
 </body>
 </html>
