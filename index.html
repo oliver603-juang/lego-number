@@ -614,11 +614,23 @@
                 <div id="dynamic-action-area" class="mt-4 hidden border-t border-gray-100 pt-4"></div>
 
                 <div id="universal-suggestions" class="mt-6 pt-4 border-t-2 border-dashed border-gray-200 hidden">
-                    <p class="text-xs font-bold text-gray-500 mb-3 flex items-center">
-                        <i class="fa-solid fa-wand-magic-sparkles mr-1 text-purple-500"></i> 
-                        相似零件與建議位置 (點擊套用)：
-                    </p>
+                    <div class="flex justify-between items-center mb-3">
+                        <p class="text-xs font-bold text-gray-500 flex items-center">
+                            <i class="fa-solid fa-magnifying-glass mr-1"></i> 相似零件與建議位置：
+                        </p>
+                        <button onclick="getAISuggestions()" id="ai-suggest-btn" class="text-[10px] bg-purple-600 text-white px-3 py-1.5 rounded-full font-bold shadow hover:bg-purple-700 hover:scale-105 transition flex items-center">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> AI 建議
+                        </button>
+                    </div>
+                    
                     <div id="universal-similar-list" class="space-y-2"></div>
+                    
+                    <div id="ai-suggestion-area" class="hidden mt-4 pt-4 border-t border-purple-100">
+                        <p class="text-xs font-bold text-purple-600 mb-2 flex items-center">
+                            <i class="fa-solid fa-robot mr-1"></i> Gemini 推薦 (優先顯示庫存)：
+                        </p>
+                        <div id="ai-suggestion-list" class="space-y-2"></div>
+                    </div>
                 </div>
             </div>
 
@@ -808,8 +820,13 @@
     <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 z-[80] flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <h3 class="font-bold text-xl mb-4 text-gray-800">設定</h3>
-            <div class="mb-4"><label class="block text-xs font-bold text-gray-500 mb-1">Gemini API Key</label><input type="password" id="gemini-key" class="w-full border-2 border-gray-200 rounded-lg p-2 focus:border-blue-500 outline-none"></div>
-            <div class="mb-6"><label class="block text-xs font-bold text-gray-500 mb-1">AI Model</label><select id="gemini-model" class="w-full border-2 border-gray-200 rounded-lg p-2 bg-white"><option value="gemini-1.5-flash">1.5 Flash</option><option value="gemini-1.5-pro">1.5 Pro</option><option value="gemini-2.0-flash-exp">2.0 Flash Exp</option></select></div>
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-500 mb-1">Gemini API Key</label>
+                <input type="password" id="gemini-key" class="w-full border-2 border-gray-200 rounded-lg p-2 focus:border-blue-500 outline-none">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-blue-500 font-bold mt-1 inline-block hover:underline"><i class="fa-solid fa-external-link-alt mr-1"></i>取得 API Key</a>
+            </div>
+			
+			<div class="mb-6"><label class="block text-xs font-bold text-gray-500 mb-1">AI Model</label><select id="gemini-model" class="w-full border-2 border-gray-200 rounded-lg p-2 bg-white"><option value="gemini-1.5-flash">1.5 Flash</option><option value="gemini-1.5-pro">1.5 Pro</option><option value="gemini-2.0-flash-exp">2.0 Flash Exp</option></select></div>
             <hr class="border-gray-100 mb-4"><button onclick="window.clearAllCloudData()" class="w-full text-red-500 border border-red-200 bg-red-50 p-3 rounded-lg mb-4 text-sm font-bold hover:bg-red-100 transition">清空所有資料</button>
             <div class="flex justify-end gap-3"><button onclick="toggleSettings()" class="px-5 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg">取消</button><button onclick="saveSettings()" class="px-5 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700">儲存</button></div>
         </div>
@@ -960,7 +977,15 @@
                 const sugBox = document.getElementById('search-suggestions');
                 if(sugBox) sugBox.classList.add('hidden');
                 document.getElementById('batch-card').classList.add('hidden');
-                
+                // ... (在 checkAndDisplayDrawer 函式內) ...
+            document.getElementById('result-area').classList.remove('hidden');
+            document.getElementById('batch-card').classList.add('hidden');
+
+            // [新增] 切換零件時，重置並隱藏 AI 建議區塊
+            document.getElementById('ai-suggestion-area').classList.add('hidden');
+            document.getElementById('ai-suggestion-list').innerHTML = '';
+
+            // ... (繼續後面的程式碼) ...
                 checkAndDisplayDrawer(ids[0]);
             }
         };
@@ -1476,8 +1501,157 @@
             const data = JSON.parse(json.candidates[0].content.parts[0].text); 
             return { id: data.id, name: data.name, img: "", source: 'Gemini' }; 
         }
+		// [新增] AI 智慧建議與庫存比對功能
+		// [修正版] AI 智慧建議 (增強除錯與 JSON 解析能力)
+        // [修正版] AI 智慧建議 (修復縮圖點擊無效的問題)
+        window.getAISuggestions = async () => {
+            // 1. 檢查 API Key
+            if (!geminiApiKey) { 
+                alert("請先點擊右上角齒輪，設定 Gemini API Key"); 
+                toggleSettings(); 
+                return; 
+            }
+            
+            // 2. 檢查是否已選擇零件
+            if (!currentPartId) {
+                alert("請先搜尋或選擇一個零件，AI 才能分析並提供建議！");
+                return;
+            }
 
-        window.toggleSettings = () => { const m = document.getElementById('settings-modal'); m.classList.toggle('hidden'); if(!m.classList.contains('hidden')) { document.getElementById('gemini-key').value = geminiApiKey; document.getElementById('gemini-model').value = geminiModel; if(geminiApiKey) document.getElementById('key-saved-msg').classList.remove('hidden'); else document.getElementById('key-saved-msg').classList.add('hidden'); } };
+            const btn = document.getElementById('ai-suggest-btn');
+            const originalHtml = btn.innerHTML;
+            
+            // 介面進入讀取狀態
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 分析中...';
+            btn.disabled = true;
+
+            // Prompt: 強制要求 JSON 格式
+            const prompt = `You are a LEGO Expert.
+            Target Part: "${currentPartId} ${currentPartName}".
+            Task: Recommend 8 other parts that are logically stored together with the target part (e.g. Wheels+Tires, Hinges, Similar Bricks).
+            Requirement: Return ONLY a JSON Array of Part IDs (Strings). NO markdown, NO explanation.
+            Example: ["3001", "3002", "3622"]`;
+
+            try {
+                // 呼叫 API
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`, { 
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json'}, 
+                    body: JSON.stringify({ contents:[{parts:[{text:prompt}]}] }) 
+                });
+                
+                if(!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(`API 錯誤 (${res.status}): ${errText}`);
+                }
+
+                const json = await res.json();
+                
+                // 安全檢查
+                if (!json.candidates || !json.candidates[0].content) {
+                    throw new Error("AI 沒有回傳任何內容，請稍後再試。");
+                }
+
+                let text = json.candidates[0].content.parts[0].text;
+                const jsonMatch = text.match(/\[.*\]/s);
+                let recommendedIds = [];
+                
+                if (jsonMatch) {
+                    try {
+                        recommendedIds = JSON.parse(jsonMatch[0]);
+                    } catch (e) {
+                        console.error("原始回應:", text);
+                        throw new Error("AI 回傳格式無法解析，請重試。");
+                    }
+                } else {
+                    throw new Error("AI 未回傳正確的列表格式。");
+                }
+
+                // --- 庫存交叉比對與渲染 ---
+                const results = [];
+                
+                recommendedIds.forEach(recId => {
+                    const idStr = String(recId).trim();
+                    const localData = window.mappings[idStr];
+                    
+                    if (localData && localData.drawers.length > 0) {
+                        // 情況 A: 已擁有
+                        results.push({
+                            id: idStr,
+                            name: localData.name,
+                            drawers: localData.drawers,
+                            owned: true,
+                            img: localData.img || `https://cdn.rebrickable.com/media/parts/ldraw/0/${idStr}.png`
+                        });
+                    } else {
+                        // 情況 B: 未擁有
+                        let catName = "Unknown Part";
+                        if (window.catalogIndex) {
+                            const found = window.catalogIndex.find(c => c.id == idStr);
+                            if (found) catName = found.name;
+                        }
+                        
+                        results.push({
+                            id: idStr,
+                            name: catName,
+                            drawers: [],
+                            owned: false,
+                            img: `https://cdn.rebrickable.com/media/parts/ldraw/0/${idStr}.png`
+                        });
+                    }
+                });
+
+                // 排序：已擁有的排前面
+                results.sort((a, b) => b.owned - a.owned);
+                const topResults = results.slice(0, 6);
+
+                // 渲染 UI
+                const list = document.getElementById('ai-suggestion-list');
+                const container = document.getElementById('ai-suggestion-area');
+
+                if (topResults.length === 0) {
+                    list.innerHTML = '<div class="text-xs text-gray-400 p-2 text-center">AI 找不到相關建議</div>';
+                } else {
+                    list.innerHTML = topResults.map(item => {
+                        // 按鈕 HTML (右側)
+                        let actionHtml = '';
+                        if (item.owned) {
+                            // 點擊後跳轉到該抽屜 (阻止冒泡，避免觸發整張卡片的跳轉)
+                            const drawerNum = item.drawers[0].toString().replace('a','');
+                            actionHtml = `<span onclick="event.stopPropagation(); openDrawerContent('${drawerNum}')" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded font-bold hover:bg-green-200 cursor-pointer border border-green-200 shadow-sm flex items-center shrink-0"><i class="fa-solid fa-box-open mr-1"></i>在 ${item.drawers[0]}</span>`;
+                        } else {
+                            actionHtml = `<span class="text-[10px] bg-gray-100 text-gray-400 px-2 py-1 rounded border border-dashed shrink-0">未擁有</span>`;
+                        }
+                        
+                        // [關鍵修正] onclick 移到最外層 div，讓點擊整行 (包含圖片) 都能跳轉
+                        return `
+                        <div class="flex items-center p-2 bg-purple-50 border border-purple-100 rounded-lg group hover:border-purple-300 transition mb-2 last:mb-0 cursor-pointer" onclick="selectPartFromDrawer('${item.id}')">
+                            <img src="${item.img}" class="w-10 h-10 object-contain bg-white rounded border mr-3" onerror="this.style.opacity=0">
+                            <div class="flex-1 min-w-0 mr-2">
+                                <div class="font-bold text-xs text-purple-800 font-mono">${item.id}</div>
+                                <div class="text-[10px] text-purple-600 truncate">${item.name}</div>
+                            </div>
+                            ${actionHtml}
+                        </div>`;
+                    }).join('');
+                }
+
+                // 顯示區域
+                container.classList.remove('hidden');
+                // 滾動到建議區
+                container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            } catch(e) {
+                console.error(e);
+                alert("AI 運作發生問題:\n" + e.message);
+            } finally {
+                // 恢復按鈕狀態
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        };
+		
+		window.toggleSettings = () => { const m = document.getElementById('settings-modal'); m.classList.toggle('hidden'); if(!m.classList.contains('hidden')) { document.getElementById('gemini-key').value = geminiApiKey; document.getElementById('gemini-model').value = geminiModel; if(geminiApiKey) document.getElementById('key-saved-msg').classList.remove('hidden'); else document.getElementById('key-saved-msg').classList.add('hidden'); } };
         window.saveSettings = () => { geminiApiKey = document.getElementById('gemini-key').value.trim(); geminiModel = document.getElementById('gemini-model').value; localStorage.setItem('lego_gemini_key', geminiApiKey); localStorage.setItem('lego_gemini_model', geminiModel); toggleSettings(); alert("設定已儲存"); };
         
         window.openDrawerContent = (drawerId) => {
@@ -1658,3 +1832,4 @@
     </script>
 </body>
 </html>
+
