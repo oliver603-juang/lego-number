@@ -613,21 +613,15 @@
 
                 <div id="dynamic-action-area" class="mt-4 hidden border-t border-gray-100 pt-4"></div>
 
-                <div id="universal-suggestions" class="mt-6 pt-4 border-t-2 border-dashed border-gray-200 hidden">
-                    <div class="flex justify-between items-center mb-3">
-                        <p class="text-xs font-bold text-gray-500 flex items-center">
-                            <i class="fa-solid fa-magnifying-glass mr-1"></i> 相似零件與建議位置：
-                        </p>
-                        <button onclick="getAISuggestions()" id="ai-suggest-btn" class="text-[10px] bg-purple-600 text-white px-3 py-1.5 rounded-full font-bold shadow hover:bg-purple-700 hover:scale-105 transition flex items-center">
-                            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> AI 建議
-                        </button>
-                    </div>
+                <div id="universal-suggestions" class="mt-4 pt-4 border-t-2 border-dashed border-gray-200 hidden">
+                    <button onclick="getAISuggestions()" id="ai-suggest-btn" class="w-full text-sm bg-purple-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-purple-700 hover:shadow-lg transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> 
+                        <span>詢問 AI 收納建議</span>
+                    </button>
                     
-                    <div id="universal-similar-list" class="space-y-2"></div>
-                    
-                    <div id="ai-suggestion-area" class="hidden mt-4 pt-4 border-t border-purple-100">
+                    <div id="ai-suggestion-area" class="hidden mt-4 pt-4 border-t border-purple-100 bg-purple-50 rounded-xl p-3">
                         <p class="text-xs font-bold text-purple-600 mb-2 flex items-center">
-                            <i class="fa-solid fa-robot mr-1"></i> Gemini 推薦 (優先顯示庫存)：
+                            <i class="fa-solid fa-robot mr-1"></i> Gemini 推薦：
                         </p>
                         <div id="ai-suggestion-list" class="space-y-2"></div>
                     </div>
@@ -1206,6 +1200,7 @@
         }
 
         // Logic
+        // [修正] 顯示零件詳情 (已移除舊版相似推薦邏輯)
         function checkAndDisplayDrawer(partId) {
             currentPartId = partId;
             const partData = (window.mappings || {})[partId];
@@ -1233,7 +1228,23 @@
             img.style.display = 'block';
             
             document.getElementById('result-area').classList.remove('hidden');
-            document.getElementById('batch-card').classList.add('hidden'); // Ensure batch card is hidden
+            document.getElementById('batch-card').classList.add('hidden');
+
+            // --- [UI 重置邏輯] ---
+            // 1. 顯示 AI 建議區塊容器
+            const uniContainer = document.getElementById('universal-suggestions');
+            uniContainer.classList.remove('hidden');
+            
+            // 2. 重置 AI 按鈕狀態與隱藏舊結果
+            document.getElementById('ai-suggestion-area').classList.add('hidden');
+            document.getElementById('ai-suggestion-list').innerHTML = '';
+            
+            const aiBtn = document.getElementById('ai-suggest-btn');
+            if(aiBtn) {
+                aiBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-2"></i> 詢問 AI 收納建議';
+                aiBtn.disabled = false;
+            }
+            // ---------------------
 
             const category = window.getLegoCategory(partId, displayName || "");
             const sourceBadge = document.getElementById('res-source');
@@ -1273,7 +1284,7 @@
                 document.getElementById('dynamic-action-area').classList.add('hidden');
                 document.getElementById('exist-actions').classList.remove('hidden');
                 document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-green-500 transition-all"; 
-                document.getElementById('info-card').classList.remove('hidden'); // Ensure info card is shown
+                document.getElementById('info-card').classList.remove('hidden'); 
                 
                 document.getElementById('drawer-list').innerHTML = drawers.map(d => {
                     const num = parseInt(d.toString().replace('a',''));
@@ -1285,104 +1296,15 @@
                 document.getElementById('status-exist').classList.add('hidden');
                 document.getElementById('status-new').classList.remove('hidden');
                 document.getElementById('info-card').className = "bg-white p-4 rounded-xl shadow-lg border-l-8 border-yellow-400 transition-all"; 
-                document.getElementById('info-card').classList.remove('hidden'); // Ensure info card is shown
+                document.getElementById('info-card').classList.remove('hidden'); 
                 setupActionPanel('add', document.getElementById('inline-action-panel'));
                 const inp = document.getElementById('drawer-input-active'); 
                 if(inp) inp.value = getNextEmptyDrawerId();
             }
-
-            const uniContainer = document.getElementById('universal-suggestions');
-            const uniList = document.getElementById('universal-similar-list');
-            const suggestions = findSimilarParts(displayName || "");
-            
-            if (suggestions.length > 0) {
-                uniList.innerHTML = suggestions.map(s => {
-                    const dNum = parseInt(s.drawers[0].toString().replace('a',''));
-                    const locLabel = dNum > 477 ? `夾鏈袋 ${s.drawers[0]}` : `抽屜 ${s.drawers[0]}`;
-                    const cat = window.getLegoCategory(s.id, s.name);
-                    const imgHtml = s.img ? 
-                        `<img src="${s.img}" onclick="event.stopPropagation(); selectPartFromDrawer('${s.id}')" class="w-10 h-10 object-contain rounded border mr-3 bg-gray-50 cursor-pointer hover:ring-2 hover:ring-blue-400 transition" title="點擊跳轉至此零件">` : 
-                        `<div onclick="event.stopPropagation(); selectPartFromDrawer('${s.id}')" class="w-10 h-10 bg-gray-100 rounded mr-3 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-blue-400 transition" title="點擊跳轉至此零件"><i class="fa-solid fa-cube text-gray-400"></i></div>`;
-
-                    return `<div class="flex items-center p-2 bg-white border border-purple-100 rounded-lg cursor-pointer hover:bg-purple-50 transition shadow-sm group">
-                        ${imgHtml}
-                        <div class="flex-1 min-w-0" onclick="useSuggestedDrawer('${s.drawers[0]}')">
-                            <div class="flex items-center gap-2">
-                                <div class="text-xs font-bold text-gray-700 truncate">${s.name}</div>
-                                <span class="text-[8px] bg-gray-100 text-gray-500 px-1 rounded border">${cat}</span>
-                            </div>
-                            <div class="text-[10px] text-gray-500 font-mono">ID: ${s.id}</div>
-                        </div>
-                        <span onclick="event.stopPropagation(); openDrawerContent('${s.drawers[0].toString().replace('a','')}')" class="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded group-hover:bg-purple-200 transition hover:underline hover:scale-105 transform">${locLabel}</span>
-                    </div>`;
-                }).join('');
-                uniContainer.classList.remove('hidden');
-            } else {
-                uniContainer.classList.add('hidden');
-            }
         }
-
+		
         function getNextEmptyDrawerId() { const used = new Set(); Object.values(window.mappings || {}).forEach(d => { if(d.drawers) d.drawers.forEach(dr => used.add(dr.toString().replace('a',''))); }); for(let i=1; i<=9999; i++) if(!used.has(i.toString())) return i; return 1; }
-        function levenshtein(a,b){if(a.length===0)return b.length;if(b.length===0)return a.length;var matrix=[];for(var i=0;i<=b.length;i++)matrix[i]=[i];for(var j=0;j<=a.length;j++)matrix[0][j]=j;for(var i=1;i<=b.length;i++){for(var j=1;j<=a.length;j++){if(b.charAt(i-1)==a.charAt(j-1))matrix[i][j]=matrix[i-1][j-1];else matrix[i][j]=Math.min(matrix[i-1][j-1]+1,Math.min(matrix[i][j-1]+1,matrix[i-1][j]+1))}}return matrix[b.length][a.length]}
         
-        // --- 優化版：相似零件推薦演算法 (加入分類權重) ---
-        function findSimilarParts(targetName) {
-            if (!targetName) return [];
-            
-            const targetId = currentPartId || "";
-            const targetCategory = window.getLegoCategory(targetId, targetName);
-            const targetMainCat = targetCategory.split('-')[0]; // 例如 "TECHNIC-beam" 取 "TECHNIC"
-            
-            const candidates = [];
-            const targetLower = targetName.toLowerCase();
-
-            // 遍歷 Firebase 同步下來的庫存資料
-            Object.entries(window.mappings).forEach(([id, data]) => {
-                // 1. 排除自己
-                if (id === targetId) return;
-                
-                if (data.name && data.drawers.length > 0) {
-                    const nameLower = data.name.toLowerCase();
-                    const itemCategory = window.getLegoCategory(id, data.name);
-                    const itemMainCat = itemCategory.split('-')[0];
-
-                    // --- 分數計算開始 ---
-                    let score = 0;
-
-                    // A. 文字相似度 (Levenshtein) - 基礎分 0~100
-                    const dist = levenshtein(targetLower, nameLower);
-                    const maxLen = Math.max(targetLower.length, nameLower.length);
-                    // 轉換為相似度分數 (距離越小，分數越高)
-                    const similarity = (1 - dist / maxLen) * 100;
-                    score += similarity;
-
-                    // B. 分類加權 (Category Boost) - 這是優化核心！
-                    if (itemCategory === targetCategory) {
-                        score += 150; // 細分類相同 (例如都是 TECHNIC-beam) -> 超級優先
-                    } else if (itemMainCat === targetMainCat) {
-                        score += 80;  // 主分類相同 (例如都是 TECHNIC) -> 優先
-                    } else if (itemMainCat === 'BASIC' && targetMainCat === 'BASIC') {
-                        score += 30;  // 都是基本磚 -> 稍微優先
-                    }
-
-                    // C. 關鍵字加權
-                    if (targetLower.includes("plate") && nameLower.includes("plate")) score += 20;
-                    if (targetLower.includes("tile") && nameLower.includes("tile")) score += 20;
-                    if (targetLower.includes("round") && nameLower.includes("round")) score += 20;
-
-                    // D. 門檻篩選
-                    // 如果分類不同，文字相似度必須很高才收錄；如果分類相同，門檻可降低
-                    if (score > 60) { 
-                        candidates.push({ ...data, id, score, category: itemCategory });
-                    }
-                }
-            });
-
-            // 依照分數高低排序，取前 6 名
-            candidates.sort((a, b) => b.score - a.score);
-            return candidates.slice(0, 6);
-        }
-
         window.getLegoCategory = (id, name) => {
             const n = name ? name.toLowerCase() : "";
             if (n.includes("motor") || n.includes("sensor") || n.includes("hub") || n.includes("battery") || n.includes("electric") || n.includes("light") || n.includes("wire")) return "ELECTRONICS";
